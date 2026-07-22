@@ -130,43 +130,32 @@ api_key = st.secrets["GEMINI_API_KEY"]
 omdb_key = st.secrets["OMDB_API_KEY"]
 client = genai.Client(api_key=api_key)
 
-# Custom 80s Slasher Fallback Poster Generator
-def get_slasher_fallback_poster(title):
-    safe_sub = html.escape(title.upper())
-    svg_code = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" width="400" height="600">
+# Universal 80s Slasher Catch-All Background Generator for Share Cards
+def get_slasher_card_background():
+    svg_code = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 650" width="400" height="650">
       <defs>
         <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#0d1117"/>
-          <stop offset="50%" stop-color="#1a0005"/>
-          <stop offset="100%" stop-color="#050505"/>
+          <stop offset="0%" stop-color="#120508"/>
+          <stop offset="50%" stop-color="#1a0206"/>
+          <stop offset="100%" stop-color="#08080c"/>
         </linearGradient>
         <linearGradient id="blood" x1="0%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%" stop-color="#ff4b4b"/>
-          <stop offset="100%" stop-color="#8b0000"/>
+          <stop offset="100%" stop-color="#600000"/>
         </linearGradient>
       </defs>
-      <rect width="400" height="600" fill="url(#bg)"/>
-      <!-- Retro Grid Lines -->
-      <path d="M0 450 L400 450 M0 480 L400 480 M0 510 L400 510 M0 540 L400 540 M0 570 L400 570" stroke="#ff4b4b" stroke-width="0.5" opacity="0.3"/>
-      <path d="M200 450 L50 600 M200 450 L120 600 M200 450 L200 600 M200 450 L280 600 M200 450 L350 600" stroke="#ff4b4b" stroke-width="0.5" opacity="0.3"/>
+      <rect width="400" height="650" fill="url(#bg)"/>
+      <!-- Retro Synthwave Grid -->
+      <path d="M0 480 L400 480 M0 515 L400 515 M0 550 L400 550 M0 585 L400 585 M0 620 L400 620" stroke="#ff4b4b" stroke-width="0.8" opacity="0.25"/>
+      <path d="M200 480 L30 650 M200 480 L100 650 M200 480 L200 650 M200 480 L300 650 M200 480 L370 650" stroke="#ff4b4b" stroke-width="0.8" opacity="0.25"/>
       
-      <!-- Slash Graphic -->
-      <path d="M50 50 L350 350" stroke="url(#blood)" stroke-width="12" stroke-linecap="round" opacity="0.8"/>
-      <path d="M60 40 L340 330" stroke="#ff8f00" stroke-width="2" opacity="0.5"/>
+      <!-- Slash Graphic Accents -->
+      <path d="M30 20 L380 370" stroke="url(#blood)" stroke-width="6" stroke-linecap="round" opacity="0.2"/>
+      <path d="M370 20 L20 370" stroke="url(#blood)" stroke-width="4" stroke-linecap="round" opacity="0.15"/>
       
-      <!-- Blood Drips -->
-      <path d="M220 220 Q225 280 220 310 Q215 330 222 340" stroke="#ff4b4b" stroke-width="6" fill="none" stroke-linecap="round"/>
-      <circle cx="222" cy="346" r="4" fill="#ff4b4b"/>
-
-      <!-- Header -->
-      <text x="200" y="90" fill="#ff8f00" font-family="'Inter', sans-serif" font-weight="900" font-size="16" text-anchor="middle" letter-spacing="4">CUSTOM VHS RELEASE</text>
-      
-      <!-- Main Title -->
-      <text x="200" y="150" fill="#ffffff" font-family="'Inter', sans-serif" font-weight="900" font-size="28" text-anchor="middle" letter-spacing="2" filter="drop-shadow(0px 0px 8px rgba(255,75,75,0.8))">{safe_sub}</text>
-      
-      <!-- Edition Banner -->
-      <rect x="40" y="380" width="320" height="40" fill="#000000" rx="8" stroke="#ff4b4b" stroke-width="2"/>
-      <text x="200" y="405" fill="#ff4b4b" font-family="'Inter', sans-serif" font-weight="800" font-size="13" text-anchor="middle" letter-spacing="2">STORY VS GORY SLASHER EDITION</text>
+      <!-- Atmospheric Glow Orbs -->
+      <circle cx="200" cy="150" r="120" fill="#ff4b4b" opacity="0.08" filter="blur(40px)"/>
+      <circle cx="200" cy="450" r="100" fill="#ff8f00" opacity="0.05" filter="blur(40px)"/>
     </svg>"""
     b64 = base64.b64encode(svg_code.encode('utf-8')).decode('utf-8')
     return f"data:image/svg+xml;base64,{b64}"
@@ -175,30 +164,16 @@ def get_slasher_fallback_poster(title):
 @st.cache_data(ttl=86400, show_spinner=False)
 def fetch_movie_data(title):
     url = f"https://www.omdbapi.com/?t={title}&apikey={omdb_key}"
-    fallback = get_slasher_fallback_poster(title)
     try:
         response = requests.get(url).json()
         if response.get("Response") == "True":
-            poster_url = response.get("Poster")
-            if not poster_url or poster_url == "N/A" or "http" not in poster_url:
-                poster_url = fallback
-                poster_b64 = fallback
-            else:
-                rated = response.get("Rated", "N/A")
-                genre = response.get("Genre", "N/A")
-                img_resp = requests.get(poster_url)
-                if img_resp.status_code == 200:
-                    b64_img = base64.b64encode(img_resp.content).decode('utf-8')
-                    poster_b64 = f"data:image/jpeg;base64,{b64_img}"
-                else:
-                    poster_b64 = fallback
-            
+            poster_url = response.get("Poster") if response.get("Poster") != "N/A" else "https://via.placeholder.com/300x450.png?text=No+Poster+Found"
             rated = response.get("Rated", "N/A")
             genre = response.get("Genre", "N/A")
-            return poster_url, poster_b64, rated, genre
+            return poster_url, rated, genre
     except:
         pass
-    return fallback, fallback, "N/A", "N/A"
+    return "https://via.placeholder.com/300x450.png?text=No+Poster+Found", "N/A", "N/A"
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight, pacing_weight):
@@ -310,12 +285,11 @@ with col2:
         safe_title = html.escape(movie_title)
         search_query = urllib.parse.quote_plus(movie_title)
 
-        # Clean dynamic progress text placeholder to completely avoid jarring boxes
         progress_box = st.empty()
         
         try:
             progress_box.info(f"🎬 Fetching cinematic data for '{safe_title}'...")
-            poster_url, poster_b64, rated, genre = fetch_movie_data(movie_title)
+            poster_url, rated, genre = fetch_movie_data(movie_title)
             
             progress_box.info("🧠 Booting up the unhinged AI critic...")
             raw_json = cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight, pacing_weight)
@@ -335,7 +309,6 @@ with col2:
             verdict_match = re.search(r"(You should .*? this movie because.*)", summary_text, re.IGNORECASE)
             short_summary = verdict_match.group(1) if verdict_match else summary_text.split('.')[-2] + "."
             
-            # Clear loading message completely once ready
             progress_box.empty()
             
             st.markdown("<br>", unsafe_allow_html=True)
@@ -376,183 +349,184 @@ with col2:
 </ul>
 </div>""", unsafe_allow_html=True)
 
-                # --- UPGRADED STORY VS GORY SHARE CARD ---
-                with st.expander("✨ Generate Shareable Verdict Card", expanded=True):
-                    wrapped_export_html = f"""
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                    <link href="[https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap)" rel="stylesheet">
-                    <style>
-                    body {{ 
-                        margin: 0; 
-                        padding: 20px; 
-                        font-family: 'Inter', sans-serif; 
-                        background-color: transparent; 
-                        display: flex; 
-                        flex-direction: column; 
-                        align-items: center; 
-                    }}
-                    .capture-wrapper {{
-                        padding: 10px;
-                        background-color: #0d1117;
-                        border-radius: 20px;
-                    }}
-                    .wrapped-container {{
-                        position: relative;
-                        background-image: linear-gradient(to bottom, rgba(13, 17, 23, 0.4), rgba(13, 17, 23, 0.95)), url('{poster_b64}');
-                        background-size: cover;
-                        background-position: center;
-                        border: 2px solid #ff4b4b;
-                        border-radius: 16px;
-                        padding: 40px 30px;
-                        text-align: center;
-                        box-shadow: 0 10px 40px rgba(255, 75, 75, 0.2);
-                        width: 100%;
-                        max-width: 380px;
-                        box-sizing: border-box;
-                        overflow: hidden;
-                    }}
-                    .wrapped-header {{
-                        font-size: 0.85rem;
-                        text-transform: uppercase;
-                        letter-spacing: 3px;
-                        color: #ff8f00;
-                        font-weight: 900;
-                        margin-bottom: 15px;
-                        text-shadow: 0 2px 4px rgba(0,0,0,0.8);
-                    }}
-                    .wrapped-title {{
-                        font-size: 2rem;
-                        font-weight: 900;
-                        color: #ffffff;
-                        margin-bottom: 20px;
-                        line-height: 1.1;
-                        text-shadow: 0 2px 10px rgba(0,0,0,0.8);
-                    }}
-                    .wrapped-score-box {{
-                        background: rgba(0, 0, 0, 0.6);
-                        backdrop-filter: blur(10px);
-                        -webkit-backdrop-filter: blur(10px);
-                        border: 2px solid #ff4b4b;
-                        border-radius: 16px;
-                        padding: 25px;
-                        margin: 20px 0;
-                        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-                    }}
-                    .wrapped-score {{
-                        font-size: 4.5rem;
-                        font-weight: 900;
-                        color: #ff4b4b;
-                        line-height: 1;
-                        text-shadow: 0 0 20px rgba(255, 75, 75, 0.4);
-                    }}
-                    .wrapped-quote {{
-                        font-size: 1.1rem;
-                        color: #e6edf3;
-                        font-style: italic;
-                        font-weight: 700;
-                        line-height: 1.4;
-                        margin-top: 20px;
-                        text-shadow: 0 2px 5px rgba(0,0,0,0.8);
-                    }}
-                    .wrapped-footer {{
-                        margin-top: 35px;
-                        padding-top: 15px;
-                        border-top: 1px solid rgba(255, 255, 255, 0.1);
-                        font-size: 0.75rem;
-                        color: #8b949e;
-                        font-weight: 800;
-                        letter-spacing: 2px;
-                    }}
-                    .wrapped-url {{
-                        font-size: 0.85rem;
-                        color: #58a6ff;
-                        font-weight: 600;
-                        letter-spacing: 0px;
-                        margin-top: 5px;
-                    }}
-                    .download-btn {{
-                        background: linear-gradient(90deg, #ff4b4b 0%, #ff8f00 100%);
-                        color: white;
-                        border: none;
-                        border-radius: 8px;
-                        padding: 14px 28px;
-                        font-weight: 800;
-                        cursor: pointer;
-                        font-size: 1rem;
-                        margin-top: 25px;
-                        font-family: 'Inter', sans-serif;
-                        box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4);
-                        transition: transform 0.2s;
-                    }}
-                    .download-btn:hover {{
-                        transform: translateY(-2px);
-                    }}
-                    </style>
-                    </head>
-                    <body>
-                    
-                    <div class="capture-wrapper" id="wrapped-capture-area">
-                        <div class="wrapped-container">
-                            <div class="wrapped-header">Algorithm Verdict</div>
-                            <div class="wrapped-title">{safe_title}</div>
-                            <div class="wrapped-score-box">
-                                <div style="font-size: 0.75rem; color: #8b949e; margin-bottom: 5px; font-weight: 800; letter-spacing: 1px;">FINAL RATING</div>
-                                <div class="wrapped-score">{score_val}</div>
-                                <div style="font-size: 0.85rem; color: #ffffff; font-weight: 800; margin-top: 5px;">/ 10.0</div>
-                            </div>
-                            <div class="wrapped-quote">"{short_summary}"</div>
-                            <div class="wrapped-footer">
-                                STORY VS GORY<br>
-                                <div class="wrapped-url">storyvsgorymovierater.streamlit.app/?movie={search_query}</div>
+                    # --- UNIVERSAL SLASHER THEME SHARE CARD ---
+                    slasher_bg = get_slasher_card_background()
+                    with st.expander("✨ Generate Shareable Verdict Card", expanded=True):
+                        wrapped_export_html = f"""
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                        <link href="[https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap)" rel="stylesheet">
+                        <style>
+                        body {{ 
+                            margin: 0; 
+                            padding: 20px; 
+                            font-family: 'Inter', sans-serif; 
+                            background-color: transparent; 
+                            display: flex; 
+                            flex-direction: column; 
+                            align-items: center; 
+                        }}
+                        .capture-wrapper {{
+                            padding: 10px;
+                            background-color: #0d1117;
+                            border-radius: 20px;
+                        }}
+                        .wrapped-container {{
+                            position: relative;
+                            background-image: url('{slasher_bg}');
+                            background-size: cover;
+                            background-position: center;
+                            border: 2px solid #ff4b4b;
+                            border-radius: 16px;
+                            padding: 40px 30px;
+                            text-align: center;
+                            box-shadow: 0 10px 40px rgba(255, 75, 75, 0.2);
+                            width: 100%;
+                            max-width: 380px;
+                            box-sizing: border-box;
+                            overflow: hidden;
+                        }}
+                        .wrapped-header {{
+                            font-size: 0.85rem;
+                            text-transform: uppercase;
+                            letter-spacing: 3px;
+                            color: #ff8f00;
+                            font-weight: 900;
+                            margin-bottom: 15px;
+                            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+                        }}
+                        .wrapped-title {{
+                            font-size: 2rem;
+                            font-weight: 900;
+                            color: #ffffff;
+                            margin-bottom: 20px;
+                            line-height: 1.1;
+                            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+                        }}
+                        .wrapped-score-box {{
+                            background: rgba(0, 0, 0, 0.75);
+                            backdrop-filter: blur(10px);
+                            -webkit-backdrop-filter: blur(10px);
+                            border: 2px solid #ff4b4b;
+                            border-radius: 16px;
+                            padding: 25px;
+                            margin: 20px 0;
+                            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                        }}
+                        .wrapped-score {{
+                            font-size: 4.5rem;
+                            font-weight: 900;
+                            color: #ff4b4b;
+                            line-height: 1;
+                            text-shadow: 0 0 20px rgba(255, 75, 75, 0.4);
+                        }}
+                        .wrapped-quote {{
+                            font-size: 1.1rem;
+                            color: #e6edf3;
+                            font-style: italic;
+                            font-weight: 700;
+                            line-height: 1.4;
+                            margin-top: 20px;
+                            text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+                        }}
+                        .wrapped-footer {{
+                            margin-top: 35px;
+                            padding-top: 15px;
+                            border-top: 1px solid rgba(255, 255, 255, 0.1);
+                            font-size: 0.75rem;
+                            color: #8b949e;
+                            font-weight: 800;
+                            letter-spacing: 2px;
+                        }}
+                        .wrapped-url {{
+                            font-size: 0.85rem;
+                            color: #58a6ff;
+                            font-weight: 600;
+                            letter-spacing: 0px;
+                            margin-top: 5px;
+                        }}
+                        .download-btn {{
+                            background: linear-gradient(90deg, #ff4b4b 0%, #ff8f00 100%);
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            padding: 14px 28px;
+                            font-weight: 800;
+                            cursor: pointer;
+                            font-size: 1rem;
+                            margin-top: 25px;
+                            font-family: 'Inter', sans-serif;
+                            box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4);
+                            transition: transform 0.2s;
+                        }}
+                        .download-btn:hover {{
+                            transform: translateY(-2px);
+                        }}
+                        </style>
+                        </head>
+                        <body>
+                        
+                        <div class="capture-wrapper" id="wrapped-capture-area">
+                            <div class="wrapped-container">
+                                <div class="wrapped-header">Algorithm Verdict</div>
+                                <div class="wrapped-title">{safe_title}</div>
+                                <div class="wrapped-score-box">
+                                    <div style="font-size: 0.75rem; color: #8b949e; margin-bottom: 5px; font-weight: 800; letter-spacing: 1px;">FINAL RATING</div>
+                                    <div class="wrapped-score">{score_val}</div>
+                                    <div style="font-size: 0.85rem; color: #ffffff; font-weight: 800; margin-top: 5px;">/ 10.0</div>
+                                </div>
+                                <div class="wrapped-quote">"{short_summary}"</div>
+                                <div class="wrapped-footer">
+                                    STORY VS GORY<br>
+                                    <div class="wrapped-url">storyvsgorymovierater.streamlit.app/?movie={search_query}</div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <button class="download-btn" id="dl-button" onclick="downloadWrapped()">📸 Download Image</button>
+                        
+                        <button class="download-btn" id="dl-button" onclick="downloadWrapped()">📸 Download Image</button>
 
-                    <script src="[https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js](https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js)"></script>
-                    <script>
-                    function downloadWrapped() {{
-                        if (typeof html2canvas === 'undefined') {{
-                            alert('The image engine is still loading! Please try clicking again in a moment.');
-                            return;
-                        }}
-                        
-                        const target = document.getElementById('wrapped-capture-area');
-                        const btn = document.getElementById('dl-button');
-                        
-                        if (target) {{
-                            btn.innerText = '📸 Generating...';
-                            btn.style.opacity = '0.7';
+                        <script src="[https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js](https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js)"></script>
+                        <script>
+                        function downloadWrapped() {{
+                            if (typeof html2canvas === 'undefined') {{
+                                alert('The image engine is still loading! Please try clicking again in a moment.');
+                                return;
+                            }}
                             
-                            html2canvas(target, {{ 
-                                backgroundColor: '#0d1117',
-                                scale: 3,
-                                useCORS: true,
-                                allowTaint: true
-                            }}).then(canvas => {{
-                                const link = document.createElement('a');
-                                link.download = 'StoryVsGory_{search_query}.png';
-                                link.href = canvas.toDataURL('image/png');
-                                link.click();
+                            const target = document.getElementById('wrapped-capture-area');
+                            const btn = document.getElementById('dl-button');
+                            
+                            if (target) {{
+                                btn.innerText = '📸 Generating...';
+                                btn.style.opacity = '0.7';
                                 
-                                btn.innerText = '📸 Download Image';
-                                btn.style.opacity = '1';
-                            }}).catch(err => {{
-                                console.error('Error generating image:', err);
-                                btn.innerText = '❌ Error - Try Again';
-                                btn.style.opacity = '1';
-                            }});
+                                html2canvas(target, {{ 
+                                    backgroundColor: '#0d1117',
+                                    scale: 3,
+                                    useCORS: true,
+                                    allowTaint: true
+                                }}).then(canvas => {{
+                                    const link = document.createElement('a');
+                                    link.download = 'StoryVsGory_{search_query}.png';
+                                    link.href = canvas.toDataURL('image/png');
+                                    link.click();
+                                    
+                                    btn.innerText = '📸 Download Image';
+                                    btn.style.opacity = '1';
+                                }}).catch(err => {{
+                                    console.error('Error generating image:', err);
+                                    btn.innerText = '❌ Error - Try Again';
+                                    btn.style.opacity = '1';
+                                }});
+                            }}
                         }}
-                    }}
-                    </script>
-                    </body>
-                    </html>
-                    """
-                    components.html(wrapped_export_html, height=850)
-                    
+                        </script>
+                        </body>
+                        </html>
+                        """
+                        components.html(wrapped_export_html, height=850)
+                        
         except json.JSONDecodeError:
             progress_box.empty()
             st.warning("⚠️ The AI got a little too wild with its swagger and broke its own formatting! Please click **'Clear AI Analysis Cache'** in the sidebar and try running it again.")
