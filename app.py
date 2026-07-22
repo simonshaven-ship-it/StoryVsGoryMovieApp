@@ -196,7 +196,7 @@ def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight):
     """
     
     response = client.models.generate_content(
-        model='gemini-3.5-flash',
+        model='gemini-3.5-flash-lite',
         contents=movie_title,
         config={
             'system_instruction': system_prompt,
