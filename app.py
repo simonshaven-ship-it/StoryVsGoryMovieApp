@@ -130,7 +130,7 @@ api_key = st.secrets["GEMINI_API_KEY"]
 omdb_key = st.secrets["OMDB_API_KEY"]
 client = genai.Client(api_key=api_key)
 
-# Universal 80s Slasher Catch-All Background Generator
+# 80s Slasher Fallback Background Generator
 def get_slasher_card_background():
     svg_code = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 650" width="400" height="650">
       <defs>
@@ -289,7 +289,6 @@ with col2:
     active_movie = st.session_state.movie_input.strip()
     if analyze_btn or active_movie:
         if analyze_btn:
-            # Force update URL query parameter immediately on submit
             st.query_params["movie"] = active_movie
             
         safe_title = html.escape(active_movie)
@@ -359,8 +358,7 @@ with col2:
 </ul>
 </div>""", unsafe_allow_html=True)
 
-                # --- UNIVERSAL SLASHER THEME SHARE CARD ---
-                slasher_bg = get_slasher_card_background()
+                # --- SHARE CARD WITH POSTER BACKGROUND & FALLBACK ---
                 with st.expander("✨ Generate Shareable Verdict Card", expanded=True):
                     wrapped_export_html = f"""
                     <!DOCTYPE html>
@@ -384,7 +382,7 @@ with col2:
                     }}
                     .wrapped-container {{
                         position: relative;
-                        background-image: url('{slasher_bg}');
+                        background-image: linear-gradient(to bottom, rgba(13, 17, 23, 0.4), rgba(13, 17, 23, 0.95)), url('{poster_b64}');
                         background-size: cover;
                         background-position: center;
                         border: 2px solid #ff4b4b;
