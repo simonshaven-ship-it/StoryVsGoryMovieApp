@@ -1,6 +1,7 @@
 import streamlit as st
 from google import genai
 import requests
+import json
 
 # 1. Setup the UI Page
 st.set_page_config(page_title="Story vs. Gore Predictor", page_icon="🎬", layout="wide")
@@ -46,15 +47,72 @@ h1, h2, h3 {
     color: white;
 }
 
-/* Enhanced Scorecard */
-.result-card {
+/* Score Pill Badges */
+.score-badge-red {
+    background: rgba(248, 81, 73, 0.15);
+    color: #f85149;
+    border: 1px solid #f85149;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 1.4rem;
+    font-weight: 800;
+    display: inline-block;
+    margin-bottom: 12px;
+}
+
+.score-badge-orange {
+    background: rgba(210, 153, 34, 0.15);
+    color: #d29922;
+    border: 1px solid #d29922;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 1.4rem;
+    font-weight: 800;
+    display: inline-block;
+    margin-bottom: 12px;
+}
+
+.score-badge-green {
+    background: rgba(46, 160, 67, 0.15);
+    color: #3fb950;
+    border: 1px solid #3fb950;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 1.4rem;
+    font-weight: 800;
+    display: inline-block;
+    margin-bottom: 12px;
+}
+
+/* Summary Verdict Card */
+.verdict-card {
+    background-color: #161b22;
+    border-radius: 12px;
+    padding: 24px;
+    border: 1px solid #30363d;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    margin-bottom: 20px;
+}
+
+/* Diagnostic Breakdown Card */
+.breakdown-card {
     background-color: #161b22;
     border-left: 4px solid #ff4b4b;
-    border-radius: 12px;
-    padding: 30px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-    color: #e6edf3;
-    height: 100%;
+    border-radius: 8px;
+    padding: 24px;
+    border-top: 1px solid #30363d;
+    border-right: 1px solid #30363d;
+    border-bottom: 1px solid #30363d;
+}
+
+.breakdown-card ul {
+    margin-bottom: 0;
+    padding-left: 20px;
+}
+
+.breakdown-card li {
+    margin-bottom: 12px;
+    line-height: 1.5;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -75,33 +133,37 @@ def fetch_poster(title):
         pass
     return "https://via.placeholder.com/300x450.png?text=No+Poster+Found"
 
-# 5. The Core System Rules
+# 5. Core System Prompt (JSON Structured Output)
 system_prompt = """
-You are a highly rigorous movie scoring algorithm based on the 'Story vs. Gore' scale, but you possess a sharp, highly opinionated, and engaging personality.
+You are a highly rigorous movie scoring algorithm based on the 'Story vs. Gore' scale, possessing a sharp, highly opinionated, and engaging personality.
 
 SPOILER PROTOCOL (CRITICAL MAXIMUM PRIORITY): 
-You must NEVER reveal specific plot twists, character deaths, true villain identities, or surprise endings. When discussing Rule 3 (Payoff) or Rule 4 (Narrative Puzzle), speak ONLY in vague, thematic terms. You must maintain the exact same mathematical scoring behind the scenes, but strictly sanitize the public explanation.
+You must NEVER reveal specific plot twists, character deaths, true villain identities, or surprise endings. Speak ONLY in vague, thematic terms.
 
-Start every movie at a baseline score of 5.0 and apply strict mathematical adjustments based on these parameters:
-- Rule 1 (Agency): Does the protagonist act with hyper-competence and treat survival like a tactical puzzle? (Add up to +2.5 points).
-- Rule 2 (Squalor/Gore): Does the movie feature visceral body horror, miserable lifestyle squalor, or mean-spirited torture? (Deduct up to -5.0 points. Stylized action is exempt).
-- Rule 3 (Payoff): Does the movie end with a triumphant, cathartic victory? (Add up to +1.5 points).
-- Rule 4 (Narrative Puzzle): Does the movie feature an intricate plot, high-tension thrills, or a mind-bending narrative puzzle? (Add up to +2.0 points). Clean, straightforward survival without complex narrative dread receives ZERO points here.
+SCORING PARAMETERS:
+Start every movie at a baseline score of 5.0 and apply strict mathematical adjustments:
+- Rule 1 (Agency): Does protagonist act with hyper-competence and treat survival like a tactical puzzle? (Add up to +2.5).
+- Rule 2 (Squalor/Gore): Visceral body horror, miserable lifestyle squalor, or torture? (Deduct up to -5.0. Stylized action exempt).
+- Rule 3 (Payoff): Triumphant, cathartic victory? (Add up to +1.5).
+- Rule 4 (Narrative Puzzle): Intricate plot, high-tension thrills, or mind-bending puzzle? (Add up to +2.0).
 
-EXCEPTIONS & ARMOR (Apply these overrides strictly):
-- Sci-Fi/Fantasy Franchise Armor: Deep, established world-building lore shields a movie from squalor deductions (e.g., Twin Peaks and Alien 3). This DOES NOT apply to grounded slasher, horror, or torture franchises (like Saw or Hostel)—they must take the full Rule 2 penalty.
-- The '12 Monkeys' Rule: A flawless, mind-bending intellectual puzzle completely nullifies any penalties for a tragic or cynical ending (Rule 3). However, a brilliant twist NEVER nullifies the squalor penalty (Rule 2). If a movie is a biohazardous trap, deduct the points regardless of how good the twist is.
+EXCEPTIONS:
+- Sci-Fi/Fantasy Franchise Armor: Deep world-building lore shields a movie from squalor deductions (e.g., Twin Peaks, Alien 3). DOES NOT apply to grounded slasher/horror (Saw, Hostel).
+- The '12 Monkeys' Rule: Flawless intellectual puzzle nullifies penalties for tragic ending (Rule 3), but NEVER nullifies squalor penalties (Rule 2).
 
-SCORING BENCHMARKS (Do not deviate from this scale):
-- 9.5 to 10.0: Flawless, mind-bending intellectual puzzles with high tension (e.g., 12 Monkeys).
-- 8.0 to 9.0: Masterful tension, sharp agency, intricate plots without extreme squalor (e.g., Get Out, American Psycho, A Quiet Place, Apex).
-- 6.0 to 7.0: Highly competent but straightforward, lacking complex dread or intricate plot puzzles (e.g., The Martian = 6.5).
-- 1.0 to 3.0: Gratuitous gore and squalor with no narrative redemption (e.g., Terrifier = 1.0).
-
-OUTPUT FORMAT (Follow this strictly):
-1. Start with the bolded final score (e.g., **SYSTEM SCORE: X.X / 10.0**).
-2. Write a punchy, highly opinionated 2-3 sentence summary paragraph. Give the algorithm a distinct personality using dramatic cinematic phrasing like "Lethal Competence," "Masterclass in Tactical Agency," or "Cinematic Biohazard."
-3. Provide the diagnostic breakdown explaining the math of how it passes or fails the Rules, formatted with clear bullet points.
+OUTPUT REQUIREMENT:
+Return ONLY a valid JSON object matching this schema exactly:
+{
+  "score": 4.5,
+  "summary": "Punchy, opinionated 2-3 sentence summary paragraph with cinematic phrasing (e.g., 'Lethal Competence', 'Cinematic Biohazard').",
+  "breakdown": [
+    "**Baseline Score**: 5.0",
+    "**Rule 1 (Agency)**: +1.0 Points. Explanation...",
+    "**Rule 2 (Squalor/Gore)**: -3.5 Points. Explanation...",
+    "**Rule 3 (Payoff)**: +0.0 Points. Explanation...",
+    "**Rule 4 (Narrative Puzzle)**: +2.0 Points. Explanation..."
+  ]
+}
 """
 
 # 6. UI Layout
@@ -120,28 +182,57 @@ with col2:
         else:
             with st.spinner(f"Running {movie_title} through the board..."):
                 try:
-                    # 1. Fetch AI Score
+                    # Request JSON format from Gemini
                     response = client.models.generate_content(
                         model='gemini-flash-latest',
                         contents=movie_title,
-                        config={'system_instruction': system_prompt, 'temperature': 0.2}
+                        config={
+                            'system_instruction': system_prompt,
+                            'temperature': 0.2,
+                            'response_mime_type': 'application/json'
+                        }
                     )
                     
-                    # 2. Fetch Poster
+                    data = json.loads(response.text)
+                    score_val = float(data.get("score", 5.0))
+                    summary_text = data.get("summary", "")
+                    breakdown_list = data.get("breakdown", [])
+                    
                     poster_url = fetch_poster(movie_title)
                     
                     st.markdown("<br>", unsafe_allow_html=True)
                     
-                    # 3. Render the Dual-Column Scorecard
+                    # Determine Badge Color
+                    if score_val >= 8.0:
+                        badge_class = "score-badge-green"
+                    elif score_val >= 5.0:
+                        badge_class = "score-badge-orange"
+                    else:
+                        badge_class = "score-badge-red"
+                        
+                    # 3. Render Dual-Column Layout
                     score_col1, score_col2 = st.columns([1, 2.5])
                     
                     with score_col1:
                         st.image(poster_url, use_container_width=True)
                         
                     with score_col2:
+                        # Top Panel: Score Badge & Personality Verdict
                         st.markdown(f"""
-                        <div class="result-card">
-                            {response.text}
+                        <div class="verdict-card">
+                            <div class="{badge_class}">SYSTEM SCORE: {score_val} / 10.0</div>
+                            <p style="font-size: 1.05rem; line-height: 1.6; margin-bottom: 0; color: #e6edf3;">{summary_text}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # Bottom Panel: Diagnostic Breakdown
+                        breakdown_html = "".join([f"<li>{item}</li>" for item in breakdown_list])
+                        st.markdown(f"""
+                        <div class="breakdown-card">
+                            <h4 style="margin-top: 0; margin-bottom: 16px; color: #ffffff;">🔍 Diagnostic Breakdown</h4>
+                            <ul>
+                                {breakdown_html}
+                            </ul>
                         </div>
                         """, unsafe_allow_html=True)
                         
