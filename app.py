@@ -41,7 +41,7 @@ h1, h2, h3 {
     border: 1px solid #30363d;
     padding: 12px;
 }
-.stButton > button, div.stFormSubmitButton > button {
+.stButton > button {
     background: linear-gradient(90deg, #ff4b4b 0%, #ff8f00 100%) !important;
     color: white !important;
     border: none !important;
@@ -51,7 +51,7 @@ h1, h2, h3 {
     transition: all 0.3s ease !important;
     width: 100% !important;
 }
-.stButton > button:hover, div.stFormSubmitButton > button:hover {
+.stButton > button:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4);
     color: white !important;
@@ -198,7 +198,7 @@ def fetch_movie_data(title):
 @st.cache_data(ttl=86400, show_spinner=False)
 def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight, pacing_weight):
     system_prompt = f"""
-    You are an unhinged, ultra-witty film critic and ruthless scoring algorithm. Your style is packed with swagger, dark humor, outrageous roasts, and vivid cinematic metaphors (e.g., "grabs a chainsaw and digs a hole underneath them"). Make the user chuckle and wow them with your razor-sharp commentary.
+    You are an unhinged, ultra-witty film critic and ruthless scoring algorithm. Your style is packed with swagger, dark humor, outrageous roasts, and vivid cinematic metaphors (e.g., "grabs a chainsaw and digs a hole underneath them"). Lean heavily into wildly colorful, razor-sharp creative phraseology, unexpected slang, and punchy vocabulary that leaves the user grinning.
 
     CRITICAL TASTE ALIGNMENT:
     You are analyzing films for a viewer who LOVES intricate plots, high-concept narrative puzzles (like 12 Monkeys, Get Out), hyper-competent tactical survival, and triumphant action. 
@@ -209,8 +209,8 @@ def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight, pacing_we
     - Puzzle Bonus Multiplier: {puzzle_weight} (Scale Rule 4 bonuses by this factor).
     - Pacing Penalty Multiplier: {pacing_weight} (Scale Rule 5 deductions by this factor).
 
-    SPOILER PROTOCOL: 
-    Never reveal specific plot twists, character deaths, or endings. Speak ONLY in vague, thematic, outrageous terms.
+    THE CODE OF HONOR (SPOILER PROTECTION): 
+    You are a critic with standards, not a cinema-ruining gossip. NEVER reveal major plot twists, identity reveals, character deaths, or the final resolution. Instead, talk around the ending with vague, menacing, or glorious thematic metaphors. Tease the tension, roast or praise the journey with rich phraseology, but keep the destination locked in the vault.
 
     SCORING PARAMETERS (Start at 5.0 baseline):
     - Rule 1 (Agency): Tactical survival, hyper-competence, improvised blueprints (Add up to +2.5).
@@ -224,19 +224,19 @@ def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight, pacing_we
     - THE 'ALIENS' EVOLUTION (Action > Horror): If a film pivots from helpless horror into hyper-competent, tactical action, it earns massive Rule 1 and Rule 3 points. Kinetic adrenaline completely OVERRIDES Rule 2 squalor penalties.
     - THE 'SLOW SLASHER' TAX: If a movie is a slow-burn claustrophobic horror where the cast spends 90% of the runtime helpless, hiding, or dying off (e.g., the original 'Alien'), it gets minimal Rule 1 points. Do not mistake basic final-act survival for tactical warfare. It should score moderately (around 5.0 - 6.0).
     - ATMOSPHERE VS. TORTURE PORN: Do NOT heavily penalize dirty, industrial, or bleak settings (like the rusty prison in 'Alien 3'). Rule 2 penalties are strictly for mean-spirited biological torture and misery, not environmental grime.
+    - THE HIGH-CONCEPT SATIRE EXEMPTION (THE 'AMERICAN PSYCHO' RULE): Masterpieces of dark psychological satire where violence and blood are used as surreal social commentary or high-concept psychological architecture bypass Rule 2 gore penalties completely. They earn massive Rule 4 puzzle/satire bonuses and should score exceptionally high (9.0 - 9.5).
+    - THE MACGYVER EFFECT (TACTICAL SURVIVAL EXEMPTION): If a film replaces helpless horror tropes and screaming with ingenious tactical blueprints, silent resourcefulness, home-engineered defense systems, and supreme problem-solving, it hits peak Rule 1 agency. This earns massive bonus weight and forces the final score straight into the elite 9.5 - 9.8 tier.
     - THE DEFIANT SACRIFICE PROTOCOL (THE 'ALIEN 3' RULE): A tragic ending where the protagonist asserts supreme agency (e.g., Ripley's furnace swan-dive) is a MASSIVE WIN. It completely nullifies Rule 3 tragedy penalties and guarantees a strong score (7.5 - 8.0) because the protagonist owned their fate.
-    - THE HIGH-CONCEPT EXEMPTION: Do not penalize violence if it serves a profound psychological or atmospheric narrative puzzle. If the violence is a necessary chess piece in a brilliant mind-bender, it is protected.
-    - The '12 Monkeys' Rule: Intellectual puzzles nullify tragic ending penalties, but NEVER torture-porn squalor.
     - CRITICAL CONSENSUS OVERRIDE: Ignore general critical acclaim or Rotten Tomatoes scores. If a universally praised epic drags its feet or features endless travel montages, hammer it with the Pacing Penalty. Conversely, if a panned or niche film matches the tactical, high-concept DNA, reward it.
     - Benchmark comparison: Drop witty side-by-side roasts against benchmark horror/action films where fitting.
 
     Return ONLY valid JSON matching this schema:
     {{
-      "score": 8.5,
-      "summary": "A hilarious, swagger-filled roast or praise of the film packed with outrageous metaphors. YOU MUST CONCLUDE THIS SUMMARY WITH THIS EXACT FORMAT: 'You should [watch / avoid] this movie because [insert witty, compelling reason].'",
+      "score": 9.6,
+      "summary": "A hilarious, swagger-filled roast or praise of the film packed with outrageous metaphors and dynamic phraseology, strictly avoiding any spoiler landmines. YOU MUST CONCLUDE THIS SUMMARY WITH THIS EXACT FORMAT: 'You should [watch / avoid] this movie because [insert witty, compelling reason].'",
       "breakdown": [
         "**Baseline Score**: 5.0",
-        "**Rule 1 (Agency)**: Witty explanation with swagger and colorful insults/praise...",
+        "**Rule 1 (Agency)**: Witty explanation with swagger and colorful vocabulary...",
         "**Rule 2 (Squalor/Gore)**: Brutally funny description of the squalor (or lack thereof)...",
         "**Rule 3 (Payoff)**: Darkly comedic breakdown of the victory or misery...",
         "**Rule 4 (Narrative Puzzle)**: Sharp, sarcastic commentary on the narrative architecture...",
@@ -286,22 +286,27 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("<p style='font-size: 0.85rem;'><b>About:</b> Built on Gemini Flash with real-time OMDb integration.</p>", unsafe_allow_html=True)
 
-# Main Input Section
+# Main Input Section (Direct layout without st.form to eliminate double-submit bugs)
 col1, col2, col3 = st.columns([1, 2, 1])
 
 if "movie_input" not in st.session_state:
     st.session_state.movie_input = st.query_params.get("movie", "")
 
 with col2:
-    with st.form("movie_form"):
-        movie_title = st.text_input("Search for a film...", key="movie_input", placeholder="e.g., The Matrix, 12 Monkeys", label_visibility="collapsed")
-        analyze_btn = st.form_submit_button("Run Algorithm")
+    entered_movie = st.text_input("Search for a film...", key="movie_input", placeholder="e.g., The Matrix, 12 Monkeys", label_visibility="collapsed")
+    analyze_btn = st.button("Run Algorithm")
 
-    active_movie = st.session_state.movie_input.strip()
-    if analyze_btn or active_movie:
-        if analyze_btn:
-            st.query_params["movie"] = active_movie
-            
+    # Determine active movie based on button click or query param / session state
+    active_movie = ""
+    if analyze_btn and entered_movie:
+        st.query_params["movie"] = entered_movie
+        active_movie = entered_movie.strip()
+    elif not analyze_btn and st.query_params.get("movie", ""):
+        active_movie = st.query_params.get("movie", "").strip()
+    elif entered_movie:
+        active_movie = entered_movie.strip()
+
+    if active_movie:
         safe_title = html.escape(active_movie)
         search_query = urllib.parse.quote_plus(active_movie)
 
@@ -510,7 +515,6 @@ with col2:
                     
                     <button class="download-btn" id="dl-button" onclick="downloadWrapped()">📸 Download Image</button>
 
-                    <!-- Server-side injected inline library script -->
                     <script>
                     {INLINE_HTML2CANVAS}
 
