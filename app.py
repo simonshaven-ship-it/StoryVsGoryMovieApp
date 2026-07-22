@@ -8,7 +8,7 @@ import base64
 # 1. Setup the UI Page
 st.set_page_config(page_title="Story vs. Gore Predictor", page_icon="🎬", layout="wide")
 
-# 2. Injecting Custom CSS (For the overall app)
+# 2. Injecting Custom CSS (For the overall app sidebar and inputs)
 st.markdown("""
 <style>
 .stApp {
@@ -184,6 +184,7 @@ with col2:
                 try:
                     raw_json = cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight)
                     
+                    # Clean markdown formatting the AI sometimes sneaks in
                     clean_json = raw_json.strip()
                     if clean_json.startswith("```"):
                         clean_json = clean_json.strip("`").replace("json\n", "", 1).strip()
@@ -207,63 +208,73 @@ with col2:
                     breakdown_html = "".join([f"<li style='margin-bottom: 12px; line-height: 1.5; color: #c9d1d9;'>{item}</li>" for item in breakdown_list])
                     search_query = movie_title.replace(" ", "+")
                     
-                    # SINGLE INLINED HTML BLOCK FOR PERFECT EXPORT
-                    result_html = f"""<div id="verdict-capture-area" style="display: flex; flex-direction: row; gap: 20px; padding: 30px; background-color: #0d1117; border-radius: 12px; border: 1px solid #30363d; font-family: 'Inter', sans-serif;">
-<div style="flex: 1; min-width: 250px;">
-<img src="{poster_b64}" style="width: 100%; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);" crossorigin="anonymous">
-<div style="background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 15px; margin-top: 15px; text-align: center;">
-<p style="font-size: 0.85rem; color: #8b949e; margin-top: 0; margin-bottom: 8px;"><b>Rated:</b> {rated} | <b>Genre:</b> {genre}</p>
-<a href="https://www.justwatch.com/us/search?q={search_query}" target="_blank" style="color: #58a6ff; text-decoration: none; font-size: 0.9rem; font-weight: 600;">🍿 Find Where to Watch</a>
-</div>
-</div>
-<div style="flex: 2.5; display: flex; flex-direction: column; gap: 20px;">
-<div style="background-color: #161b22; border-radius: 12px; padding: 24px; border: 1px solid #30363d; box-shadow: 0 8px 24px rgba(0,0,0,0.3);">
-{badge_html}
-<p style="font-size: 1.05rem; line-height: 1.6; margin-bottom: 0; color: #e6edf3;">{summary_text}</p>
-</div>
-<div style="background-color: #161b22; border-left: 4px solid #ff4b4b; border-radius: 8px; padding: 24px; border-top: 1px solid #30363d; border-right: 1px solid #30363d; border-bottom: 1px solid #30363d;">
-<h4 style="margin-top: 0; margin-bottom: 16px; color: #ffffff;">🔍 Diagnostic Breakdown</h4>
-<ul style="margin-bottom: 0; padding-left: 20px;">
-{breakdown_html}
-</ul>
-</div>
-</div>
-</div>"""
+                    # COMBINED HTML AND SCRIPT FOR IFRAME EXPORT
+                    export_html = f"""
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                    <link href="[https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap)" rel="stylesheet">
+                    <script src="[https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js](https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js)"></script>
+                    <style>
+                        body {{ margin: 0; padding: 10px; background-color: #0d1117; color: #c9d1d9; font-family: 'Inter', sans-serif; }}
+                        button:hover {{ transform: translateY(-2px); box-shadow: 0 6px 16px rgba(255, 75, 75, 0.6); }}
+                    </style>
+                    </head>
+                    <body>
                     
-                    # Render the HTML block
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    st.markdown(result_html, unsafe_allow_html=True)
-                    
-                    # Inject the JS Screenshot Button
-                    components.html(
-                        f"""
-                        <script src="[https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js](https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js)"></script>
-                        <div style="display: flex; justify-content: center; margin-top: 5px;">
-                            <button onclick="downloadCard()" style="background: linear-gradient(90deg, #ff4b4b 0%, #ff8f00 100%); color: white; border: none; border-radius: 8px; padding: 12px 24px; font-weight: 600; cursor: pointer; font-size: 1rem; box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4); font-family: 'Inter', sans-serif;">
-                                📸 Download Verdict Card
-                            </button>
+                    <div id="verdict-capture-area" style="display: flex; flex-direction: row; gap: 20px; padding: 30px; background-color: #0d1117; border-radius: 12px; border: 1px solid #30363d; font-family: 'Inter', sans-serif;">
+                        <div style="flex: 1; min-width: 250px;">
+                            <img src="{poster_b64}" style="width: 100%; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);" crossorigin="anonymous">
+                            <div style="background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 15px; margin-top: 15px; text-align: center;">
+                                <p style="font-size: 0.85rem; color: #8b949e; margin-top: 0; margin-bottom: 8px;"><b>Rated:</b> {rated} | <b>Genre:</b> {genre}</p>
+                                <a href="[https://www.justwatch.com/us/search?q=](https://www.justwatch.com/us/search?q=){search_query}" target="_blank" style="color: #58a6ff; text-decoration: none; font-size: 0.9rem; font-weight: 600;">🍿 Find Where to Watch</a>
+                            </div>
                         </div>
-                        <script>
-                        function downloadCard() {{
-                            const target = window.parent.document.getElementById('verdict-capture-area');
-                            if (target) {{
-                                html2canvas(target, {{ 
-                                    backgroundColor: '#0d1117', 
-                                    scale: 2, 
-                                    useCORS: true,
-                                    allowTaint: true
-                                }}).then(canvas => {{
-                                    const link = document.createElement('a');
-                                    link.download = '{movie_title.replace(" ", "_")}_Verdict.png';
-                                    link.href = canvas.toDataURL('image/png');
-                                    link.click();
-                                }});
-                            }}
+                        <div style="flex: 2.5; display: flex; flex-direction: column; gap: 20px;">
+                            <div style="background-color: #161b22; border-radius: 12px; padding: 24px; border: 1px solid #30363d; box-shadow: 0 8px 24px rgba(0,0,0,0.3);">
+                                {badge_html}
+                                <p style="font-size: 1.05rem; line-height: 1.6; margin-bottom: 0; color: #e6edf3;">{summary_text}</p>
+                            </div>
+                            <div style="background-color: #161b22; border-left: 4px solid #ff4b4b; border-radius: 8px; padding: 24px; border-top: 1px solid #30363d; border-right: 1px solid #30363d; border-bottom: 1px solid #30363d;">
+                                <h4 style="margin-top: 0; margin-bottom: 16px; color: #ffffff;">🔍 Diagnostic Breakdown</h4>
+                                <ul style="margin-bottom: 0; padding-left: 20px;">
+                                    {breakdown_html}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: center; margin-top: 20px; padding-bottom: 20px;">
+                        <button onclick="downloadCard()" style="background: linear-gradient(90deg, #ff4b4b 0%, #ff8f00 100%); color: white; border: none; border-radius: 8px; padding: 12px 24px; font-weight: 600; cursor: pointer; font-size: 1rem; box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4); font-family: 'Inter', sans-serif; transition: all 0.3s ease;">
+                            📸 Download Verdict Card
+                        </button>
+                    </div>
+
+                    <script>
+                    function downloadCard() {{
+                        const target = document.getElementById('verdict-capture-area');
+                        if (target) {{
+                            html2canvas(target, {{ 
+                                backgroundColor: '#0d1117', 
+                                scale: 2, 
+                                useCORS: true,
+                                allowTaint: true
+                            }}).then(canvas => {{
+                                const link = document.createElement('a');
+                                link.download = '{movie_title.replace(" ", "_")}_Verdict.png';
+                                link.href = canvas.toDataURL('image/png');
+                                link.click();
+                            }});
                         }}
-                        </script>
-                        """,
-                        height=80
-                    )
+                    }}
+                    </script>
+                    </body>
+                    </html>
+                    """
+                    
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    # Render both the card and the script securely inside the same iframe
+                    components.html(export_html, height=800, scrolling=True)
                         
                 except json.JSONDecodeError:
                     st.warning("⚠️ The AI got a little too wild with its swagger and broke its own formatting! Please click **'Clear AI Analysis Cache'** in the sidebar and try running it again.")
