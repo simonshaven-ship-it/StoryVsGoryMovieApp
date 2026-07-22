@@ -130,7 +130,7 @@ api_key = st.secrets["GEMINI_API_KEY"]
 omdb_key = st.secrets["OMDB_API_KEY"]
 client = genai.Client(api_key=api_key)
 
-# 4. Cached Helper Functions (show_spinner=False removes the white bar)
+# 4. Cached Helper Functions
 @st.cache_data(ttl=86400, show_spinner=False)
 def fetch_movie_data(title):
     url = f"https://www.omdbapi.com/?t={title}&apikey={omdb_key}"
@@ -227,7 +227,7 @@ with st.sidebar:
         gore_tolerance = st.slider("Gore Penalty Weight", min_value=0.0, max_value=2.0, value=1.0, step=0.1)
         puzzle_weight = st.slider("Puzzle Bonus Weight", min_value=0.5, max_value=2.0, value=1.0, step=0.1)
         pacing_weight = st.slider("Pacing Penalty Weight", min_value=0.0, max_value=2.0, value=1.0, step=0.1)
-        st.caption("ℹ️ Note: Re-run the algorithm after tweaking sliders to update your results.")
+        st.caption("ℹ️ Note: Auto-updates when tweaking sliders if a movie is already analyzed.")
     
     if 'gore_tolerance' not in locals():
         gore_tolerance = 1.0
@@ -248,261 +248,267 @@ with st.sidebar:
 # Main Input Section
 col1, col2, col3 = st.columns([1, 2, 1])
 
+# Check if a movie was passed in the URL to enable deep linking
+default_movie = st.query_params.get("movie", "")
+
 with col2:
     with st.form("movie_form"):
-        movie_title = st.text_input("Search for a film...", placeholder="e.g., The Matrix, 12 Monkeys", label_visibility="collapsed")
+        movie_title = st.text_input("Search for a film...", value=default_movie, placeholder="e.g., The Matrix, 12 Monkeys", label_visibility="collapsed")
         analyze_btn = st.form_submit_button("Run Algorithm")
 
-    if analyze_btn:
-        if not movie_title:
-            st.warning("Please enter a movie title.")
-        else:
-            safe_title = html.escape(movie_title)
-            search_query = urllib.parse.quote_plus(movie_title)
+    # Trigger if button is pressed OR if a movie is present in the URL / text box
+    if analyze_btn or (movie_title and movie_title == default_movie):
+        
+        # Update URL so the user can easily share their exact result
+        st.query_params["movie"] = movie_title
+        
+        safe_title = html.escape(movie_title)
+        search_query = urllib.parse.quote_plus(movie_title)
 
-            with st.spinner(f"Analyzing {movie_title}..."):
-                try:
-                    raw_json = cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight, pacing_weight)
+        with st.spinner(f"Analyzing {movie_title}..."):
+            try:
+                raw_json = cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight, pacing_weight)
+                
+                clean_json = raw_json.strip()
+                if clean_json.startswith("```"):
+                    clean_json = clean_json.strip("`").replace("json\n", "", 1).strip()
                     
-                    clean_json = raw_json.strip()
-                    if clean_json.startswith("```"):
-                        clean_json = clean_json.strip("`").replace("json\n", "", 1).strip()
-                        
-                    data = json.loads(clean_json)
+                data = json.loads(clean_json)
+                
+                score_val = float(data.get("score", 5.0))
+                summary_text = html.escape(data.get("summary", ""))
+                breakdown_list = [html.escape(item) for item in data.get("breakdown", [])]
+                
+                # Regex to rip out just the final quippy verdict for the share card
+                verdict_match = re.search(r"(You should .*? this movie because.*)", summary_text, re.IGNORECASE)
+                short_summary = verdict_match.group(1) if verdict_match else summary_text.split('.')[-2] + "."
+                
+                poster_url, poster_b64, rated, genre = fetch_movie_data(movie_title)
+                
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+                if score_val >= 8.0:
+                    badge_class = "score-badge-green"
+                elif score_val >= 5.0:
+                    badge_class = "score-badge-orange"
+                else:
+                    badge_class = "score-badge-red"
                     
-                    score_val = float(data.get("score", 5.0))
-                    summary_text = html.escape(data.get("summary", ""))
-                    breakdown_list = [html.escape(item) for item in data.get("breakdown", [])]
+                score_col1, score_col2 = st.columns([1, 2.5])
+                
+                with score_col1:
+                    st.image(poster_url, use_container_width=True)
                     
-                    # Regex to rip out just the final quippy verdict for the share card
-                    verdict_match = re.search(r"(You should .*? this movie because.*)", summary_text, re.IGNORECASE)
-                    short_summary = verdict_match.group(1) if verdict_match else summary_text.split('.')[-2] + "."
+                    st.markdown(f"""
+                    <div class="streaming-box">
+                        <p style="font-size: 0.85rem; color: #8b949e; margin-bottom: 8px;"><b>Rated:</b> {rated} | <b>Genre:</b> {genre}</p>
+                        <a href="[https://www.justwatch.com/us/search?q=](https://www.justwatch.com/us/search?q=){search_query}" target="_blank" style="color: #58a6ff; text-decoration: none; font-size: 0.9rem; font-weight: 600;">🍿 Find Where to Watch</a>
+                    </div>
+                    """, unsafe_allow_html=True)
                     
-                    poster_url, poster_b64, rated, genre = fetch_movie_data(movie_title)
+                with score_col2:
+                    st.markdown(f"""
+                    <div class="verdict-card">
+                        <div class="{badge_class}">SYSTEM SCORE: {score_val} / 10.0</div>
+                        <p style="font-size: 1.05rem; line-height: 1.6; margin-bottom: 0; color: #e6edf3;">{summary_text}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
                     
-                    st.markdown("<br>", unsafe_allow_html=True)
+                    breakdown_html = "".join([f"<li>{item}</li>" for item in breakdown_list])
                     
-                    if score_val >= 8.0:
-                        badge_class = "score-badge-green"
-                    elif score_val >= 5.0:
-                        badge_class = "score-badge-orange"
-                    else:
-                        badge_class = "score-badge-red"
-                        
-                    score_col1, score_col2 = st.columns([1, 2.5])
-                    
-                    with score_col1:
-                        st.image(poster_url, use_container_width=True)
-                        
-                        st.markdown(f"""
-                        <div class="streaming-box">
-                            <p style="font-size: 0.85rem; color: #8b949e; margin-bottom: 8px;"><b>Rated:</b> {rated} | <b>Genre:</b> {genre}</p>
-                            <a href="[https://www.justwatch.com/us/search?q=](https://www.justwatch.com/us/search?q=){search_query}" target="_blank" style="color: #58a6ff; text-decoration: none; font-size: 0.9rem; font-weight: 600;">🍿 Find Where to Watch</a>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        
-                    with score_col2:
-                        st.markdown(f"""
-                        <div class="verdict-card">
-                            <div class="{badge_class}">SYSTEM SCORE: {score_val} / 10.0</div>
-                            <p style="font-size: 1.05rem; line-height: 1.6; margin-bottom: 0; color: #e6edf3;">{summary_text}</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        
-                        breakdown_html = "".join([f"<li>{item}</li>" for item in breakdown_list])
-                        
-                        st.markdown(f"""<div class="breakdown-card">
+                    st.markdown(f"""<div class="breakdown-card">
 <h4 style="margin-top: 0; margin-bottom: 16px; color: #ffffff;">🔍 Diagnostic Breakdown</h4>
 <ul>
 {breakdown_html}
 </ul>
 </div>""", unsafe_allow_html=True)
 
-                        # --- UPGRADED STORY VS GORY SHARE CARD ---
-                        with st.expander("✨ Generate Shareable Verdict Card"):
-                            wrapped_export_html = f"""
-                            <!DOCTYPE html>
-                            <html>
-                            <head>
-                            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
-                            <style>
-                            body {{ 
-                                margin: 0; 
-                                padding: 20px; 
-                                font-family: 'Inter', sans-serif; 
-                                background-color: transparent; 
-                                display: flex; 
-                                flex-direction: column; 
-                                align-items: center; 
-                            }}
-                            .capture-wrapper {{
-                                padding: 10px;
-                                background-color: #0d1117;
-                                border-radius: 20px;
-                            }}
-                            .wrapped-container {{
-                                position: relative;
-                                background-image: linear-gradient(to bottom, rgba(13, 17, 23, 0.4), rgba(13, 17, 23, 0.95)), url('{poster_b64}');
-                                background-size: cover;
-                                background-position: center;
-                                border: 2px solid #ff4b4b;
-                                border-radius: 16px;
-                                padding: 40px 30px;
-                                text-align: center;
-                                box-shadow: 0 10px 40px rgba(255, 75, 75, 0.2);
-                                width: 100%;
-                                max-width: 380px;
-                                box-sizing: border-box;
-                                overflow: hidden;
-                            }}
-                            .wrapped-header {{
-                                font-size: 0.85rem;
-                                text-transform: uppercase;
-                                letter-spacing: 3px;
-                                color: #ff8f00;
-                                font-weight: 900;
-                                margin-bottom: 15px;
-                                text-shadow: 0 2px 4px rgba(0,0,0,0.8);
-                            }}
-                            .wrapped-title {{
-                                font-size: 2rem;
-                                font-weight: 900;
-                                color: #ffffff;
-                                margin-bottom: 20px;
-                                line-height: 1.1;
-                                text-shadow: 0 2px 10px rgba(0,0,0,0.8);
-                            }}
-                            .wrapped-score-box {{
-                                background: rgba(0, 0, 0, 0.6);
-                                backdrop-filter: blur(10px);
-                                -webkit-backdrop-filter: blur(10px);
-                                border: 2px solid #ff4b4b;
-                                border-radius: 16px;
-                                padding: 25px;
-                                margin: 20px 0;
-                                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-                            }}
-                            .wrapped-score {{
-                                font-size: 4.5rem;
-                                font-weight: 900;
-                                color: #ff4b4b;
-                                line-height: 1;
-                                text-shadow: 0 0 20px rgba(255, 75, 75, 0.4);
-                            }}
-                            .wrapped-quote {{
-                                font-size: 1.1rem;
-                                color: #e6edf3;
-                                font-style: italic;
-                                font-weight: 700;
-                                line-height: 1.4;
-                                margin-top: 20px;
-                                text-shadow: 0 2px 5px rgba(0,0,0,0.8);
-                            }}
-                            .wrapped-footer {{
-                                margin-top: 35px;
-                                padding-top: 15px;
-                                border-top: 1px solid rgba(255, 255, 255, 0.1);
-                                font-size: 0.75rem;
-                                color: #8b949e;
-                                font-weight: 800;
-                                letter-spacing: 2px;
-                            }}
-                            .wrapped-url {{
-                                font-size: 0.85rem;
-                                color: #58a6ff;
-                                font-weight: 600;
-                                letter-spacing: 0px;
-                                margin-top: 5px;
-                            }}
-                            .download-btn {{
-                                background: linear-gradient(90deg, #ff4b4b 0%, #ff8f00 100%);
-                                color: white;
-                                border: none;
-                                border-radius: 8px;
-                                padding: 14px 28px;
-                                font-weight: 800;
-                                cursor: pointer;
-                                font-size: 1rem;
-                                margin-top: 25px;
-                                font-family: 'Inter', sans-serif;
-                                box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4);
-                                transition: transform 0.2s;
-                            }}
-                            .download-btn:hover {{
-                                transform: translateY(-2px);
-                            }}
-                            </style>
-                            </head>
-                            <body>
-                            
-                            <div class="capture-wrapper" id="wrapped-capture-area">
-                                <div class="wrapped-container">
-                                    <div class="wrapped-header">Algorithm Verdict</div>
-                                    <div class="wrapped-title">{safe_title}</div>
-                                    <div class="wrapped-score-box">
-                                        <div style="font-size: 0.75rem; color: #8b949e; margin-bottom: 5px; font-weight: 800; letter-spacing: 1px;">FINAL RATING</div>
-                                        <div class="wrapped-score">{score_val}</div>
-                                        <div style="font-size: 0.85rem; color: #ffffff; font-weight: 800; margin-top: 5px;">/ 10.0</div>
-                                    </div>
-                                    <div class="wrapped-quote">"{short_summary}"</div>
-                                    <div class="wrapped-footer">
-                                        STORY VS GORY<br>
-                                        <div class="wrapped-url">storyvsgory.app</div>
-                                    </div>
+                    # --- UPGRADED STORY VS GORY SHARE CARD ---
+                    with st.expander("✨ Generate Shareable Verdict Card"):
+                        wrapped_export_html = f"""
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                        <link href="[https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap)" rel="stylesheet">
+                        <style>
+                        body {{ 
+                            margin: 0; 
+                            padding: 20px; 
+                            font-family: 'Inter', sans-serif; 
+                            background-color: transparent; 
+                            display: flex; 
+                            flex-direction: column; 
+                            align-items: center; 
+                        }}
+                        /* Added container wrapper to prevent HTML2Canvas top-clipping bug */
+                        .capture-wrapper {{
+                            padding: 10px;
+                            background-color: #0d1117;
+                            border-radius: 20px;
+                        }}
+                        .wrapped-container {{
+                            position: relative;
+                            background-image: linear-gradient(to bottom, rgba(13, 17, 23, 0.4), rgba(13, 17, 23, 0.95)), url('{poster_b64}');
+                            background-size: cover;
+                            background-position: center;
+                            border: 2px solid #ff4b4b;
+                            border-radius: 16px;
+                            padding: 40px 30px;
+                            text-align: center;
+                            box-shadow: 0 10px 40px rgba(255, 75, 75, 0.2);
+                            width: 100%;
+                            max-width: 380px;
+                            box-sizing: border-box;
+                            overflow: hidden;
+                        }}
+                        .wrapped-header {{
+                            font-size: 0.85rem;
+                            text-transform: uppercase;
+                            letter-spacing: 3px;
+                            color: #ff8f00;
+                            font-weight: 900;
+                            margin-bottom: 15px;
+                            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+                        }}
+                        .wrapped-title {{
+                            font-size: 2rem;
+                            font-weight: 900;
+                            color: #ffffff;
+                            margin-bottom: 20px;
+                            line-height: 1.1;
+                            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+                        }}
+                        .wrapped-score-box {{
+                            background: rgba(0, 0, 0, 0.6);
+                            backdrop-filter: blur(10px);
+                            -webkit-backdrop-filter: blur(10px);
+                            border: 2px solid #ff4b4b;
+                            border-radius: 16px;
+                            padding: 25px;
+                            margin: 20px 0;
+                            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                        }}
+                        .wrapped-score {{
+                            font-size: 4.5rem;
+                            font-weight: 900;
+                            color: #ff4b4b;
+                            line-height: 1;
+                            text-shadow: 0 0 20px rgba(255, 75, 75, 0.4);
+                        }}
+                        .wrapped-quote {{
+                            font-size: 1.1rem;
+                            color: #e6edf3;
+                            font-style: italic;
+                            font-weight: 700;
+                            line-height: 1.4;
+                            margin-top: 20px;
+                            text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+                        }}
+                        .wrapped-footer {{
+                            margin-top: 35px;
+                            padding-top: 15px;
+                            border-top: 1px solid rgba(255, 255, 255, 0.1);
+                            font-size: 0.75rem;
+                            color: #8b949e;
+                            font-weight: 800;
+                            letter-spacing: 2px;
+                        }}
+                        .wrapped-url {{
+                            font-size: 0.85rem;
+                            color: #58a6ff;
+                            font-weight: 600;
+                            letter-spacing: 0px;
+                            margin-top: 5px;
+                        }}
+                        .download-btn {{
+                            background: linear-gradient(90deg, #ff4b4b 0%, #ff8f00 100%);
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            padding: 14px 28px;
+                            font-weight: 800;
+                            cursor: pointer;
+                            font-size: 1rem;
+                            margin-top: 25px;
+                            font-family: 'Inter', sans-serif;
+                            box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4);
+                            transition: transform 0.2s;
+                        }}
+                        .download-btn:hover {{
+                            transform: translateY(-2px);
+                        }}
+                        </style>
+                        </head>
+                        <body>
+                        
+                        <div class="capture-wrapper" id="wrapped-capture-area">
+                            <div class="wrapped-container">
+                                <div class="wrapped-header">Algorithm Verdict</div>
+                                <div class="wrapped-title">{safe_title}</div>
+                                <div class="wrapped-score-box">
+                                    <div style="font-size: 0.75rem; color: #8b949e; margin-bottom: 5px; font-weight: 800; letter-spacing: 1px;">FINAL RATING</div>
+                                    <div class="wrapped-score">{score_val}</div>
+                                    <div style="font-size: 0.85rem; color: #ffffff; font-weight: 800; margin-top: 5px;">/ 10.0</div>
+                                </div>
+                                <div class="wrapped-quote">"{short_summary}"</div>
+                                <div class="wrapped-footer">
+                                    STORY VS GORY<br>
+                                    <div class="wrapped-url">storyvsgorymovierater.streamlit.app</div>
                                 </div>
                             </div>
-                            
-                            <button class="download-btn" id="dl-button" onclick="downloadWrapped()">📸 Download Image</button>
+                        </div>
+                        
+                        <button class="download-btn" id="dl-button" onclick="downloadWrapped()">📸 Download Image</button>
 
-                            <!-- Moved script to body and using jsDelivr -->
-                            <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-                            <script>
-                            function downloadWrapped() {{
-                                // Safety check to ensure library is loaded
-                                if (typeof html2canvas === 'undefined') {{
-                                    alert('The image engine is still loading! Please try clicking again in a moment.');
-                                    return;
-                                }}
-                                
-                                const target = document.getElementById('wrapped-capture-area');
-                                const btn = document.getElementById('dl-button');
-                                
-                                if (target) {{
-                                    // Visual feedback that it is working
-                                    btn.innerText = '📸 Generating...';
-                                    btn.style.opacity = '0.7';
-                                    
-                                    html2canvas(target, {{ 
-                                        backgroundColor: '#0d1117',
-                                        scale: 3,
-                                        useCORS: true,
-                                        allowTaint: true
-                                    }}).then(canvas => {{
-                                        const link = document.createElement('a');
-                                        link.download = 'StoryVsGory_{search_query}.png';
-                                        link.href = canvas.toDataURL('image/png');
-                                        link.click();
-                                        
-                                        // Reset button
-                                        btn.innerText = '📸 Download Image';
-                                        btn.style.opacity = '1';
-                                    }}).catch(err => {{
-                                        console.error('Error generating image:', err);
-                                        btn.innerText = '❌ Error - Try Again';
-                                        btn.style.opacity = '1';
-                                    }});
-                                }}
+                        <!-- Moved script to body and using jsDelivr -->
+                        <script src="[https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js](https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js)"></script>
+                        <script>
+                        function downloadWrapped() {{
+                            // Safety check to ensure library is loaded
+                            if (typeof html2canvas === 'undefined') {{
+                                alert('The image engine is still loading! Please try clicking again in a moment.');
+                                return;
                             }}
-                            </script>
-                            </body>
-                            </html>
-                            """
-                            components.html(wrapped_export_html, height=850)
                             
-                except json.JSONDecodeError:
-                    st.warning("⚠️ The AI got a little too wild with its swagger and broke its own formatting! Please click **'Clear AI Analysis Cache'** in the sidebar and try running it again.")
-                except Exception as e:
-                    if "503" in str(e) or "UNAVAILABLE" in str(e):
-                        st.warning("⚠️ The movie algorithm backend is currently experiencing heavy traffic. Please give it a moment and try running it again!")
-                    else:
-                        st.error(f"An error occurred: {e}")
+                            const target = document.getElementById('wrapped-capture-area');
+                            const btn = document.getElementById('dl-button');
+                            
+                            if (target) {{
+                                // Visual feedback that it is working
+                                btn.innerText = '📸 Generating...';
+                                btn.style.opacity = '0.7';
+                                
+                                html2canvas(target, {{ 
+                                    backgroundColor: '#0d1117',
+                                    scale: 3,
+                                    useCORS: true,
+                                    allowTaint: true
+                                }}).then(canvas => {{
+                                    const link = document.createElement('a');
+                                    link.download = 'StoryVsGory_{search_query}.png';
+                                    link.href = canvas.toDataURL('image/png');
+                                    link.click();
+                                    
+                                    // Reset button
+                                    btn.innerText = '📸 Download Image';
+                                    btn.style.opacity = '1';
+                                }}).catch(err => {{
+                                    console.error('Error generating image:', err);
+                                    btn.innerText = '❌ Error - Try Again';
+                                    btn.style.opacity = '1';
+                                }});
+                            }}
+                        }}
+                        </script>
+                        </body>
+                        </html>
+                        """
+                        components.html(wrapped_export_html, height=850)
+                        
+            except json.JSONDecodeError:
+                st.warning("⚠️ The AI got a little too wild with its swagger and broke its own formatting! Please click **'Clear AI Analysis Cache'** in the sidebar and try running it again.")
+            except Exception as e:
+                if "503" in str(e) or "UNAVAILABLE" in str(e):
+                    st.warning("⚠️ The movie algorithm backend is currently experiencing heavy traffic. Please give it a moment and try running it again!")
+                else:
+                    st.error(f"An error occurred: {e}")
