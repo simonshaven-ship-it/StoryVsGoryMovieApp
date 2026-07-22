@@ -6,13 +6,28 @@ import json
 # 1. Setup the UI Page
 st.set_page_config(page_title="Story vs. Gore Predictor", page_icon="🎬", layout="wide")
 
-# 2. Injecting Custom CSS
+# 2. Injecting Custom CSS (Fixing Sidebar Contrast & Styling)
 st.markdown("""
 <style>
+/* Main Dark Theme */
 .stApp {
     background-color: #0d1117;
     color: #c9d1d9;
     font-family: 'Inter', sans-serif;
+}
+
+/* Force Sidebar to match dark cinematic aesthetic and fix text readability */
+[data-testid="stSidebar"] {
+    background-color: #161b22;
+    border-right: 1px solid #30363d;
+}
+
+[data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] span {
+    color: #ffffff !important;
+}
+
+[data-testid="stSidebar"] p, [data-testid="stSidebar"] label {
+    color: #8b949e !important;
 }
 
 h1, h2, h3 {
@@ -127,7 +142,8 @@ api_key = st.secrets["GEMINI_API_KEY"]
 omdb_key = st.secrets["OMDB_API_KEY"]
 client = genai.Client(api_key=api_key)
 
-# 4. Helper Function: Fetch Movie Data & Poster from OMDb
+# 4. Cached Helper Functions (Feature 3: Quota Protection via Caching)
+@st.cache_data(ttl=86400)
 def fetch_movie_data(title):
     url = f"http://www.omdbapi.com/?t={title}&apikey={omdb_key}"
     try:
@@ -141,23 +157,77 @@ def fetch_movie_data(title):
         pass
     return "https://via.placeholder.com/300x450.png?text=No+Poster+Found", "N/A", "N/A"
 
-# 5. UI Layout & Sidebar Controls (Feature 2: Sliders)
+@st.cache_data(ttl=86400)
+def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight):
+    system_prompt = f"""
+    You are a highly rigorous movie scoring algorithm based on the 'Story vs. Gore' scale, possessing a sharp, opinionated personality.
+    
+    USER CALIBRATION MODIFIERS:
+    - Squalor Penalty Multiplier: {gore_tolerance} (Scale Rule 2 deductions by this factor).
+    - Puzzle Bonus Multiplier: {puzzle_weight} (Scale Rule 4 bonuses by this factor).
+
+    SPOILER PROTOCOL (CRITICAL MAXIMUM PRIORITY): 
+    Never reveal specific plot twists, character deaths, or endings. Speak ONLY in vague, thematic terms.
+
+    SCORING PARAMETERS:
+    Start at 5.0 baseline and adjust:
+    - Rule 1 (Agency): Tactical survival (Add up to +2.5).
+    - Rule 2 (Squalor/Gore): Body horror/miserable grime (Deduct up to -5.0 * {gore_tolerance}).
+    - Rule 3 (Payoff): Triumphant victory (Add up to +1.5).
+    - Rule 4 (Narrative Puzzle): Intricate plot/puzzle (Add up to +2.0 * {puzzle_weight}).
+
+    EXCEPTIONS:
+    - Sci-Fi Franchise Armor: Twin Peaks, Alien 3 protected from squalor.
+    - '12 Monkeys' Rule: Intellectual puzzle nullifies tragic ending penalty (Rule 3), but NEVER squalor (Rule 2).
+
+    Return ONLY valid JSON matching this schema:
+    {{
+      "score": 4.5,
+      "summary": "Opinionated 2-3 sentence summary with cinematic phrasing.",
+      "breakdown": [
+        "**Baseline Score**: 5.0",
+        "**Rule 1 (Agency)**: Explanation...",
+        "**Rule 2 (Squalor/Gore)**: Explanation...",
+        "**Rule 3 (Payoff)**: Explanation...",
+        "**Rule 4 (Narrative Puzzle)**: Explanation..."
+      ]
+    }}
+    """
+    
+    response = client.models.generate_content(
+        model='gemini-flash-latest',
+        contents=movie_title,
+        config={
+            'system_instruction': system_prompt,
+            'temperature': 0.2,
+            'response_mime_type': 'application/json'
+        }
+    )
+    return response.text
+
+# 5. UI Layout & Collapsed Sidebar Controls (Feature 2)
 st.markdown("<h1 style='text-align: center; margin-top: 1rem;'>🎬 The Movie Enjoyment Predictor</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #8b949e; font-size: 1.2rem; margin-bottom: 30px;'>Calibrate the rules and test your film library against the board.</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #8b949e; font-size: 1.2rem; margin-bottom: 30px;'>Does your movie survive the algorithm?</p>", unsafe_allow_html=True)
 
 with st.sidebar:
-    st.header("🎛️ Algorithm Calibration")
-    st.write("Customize how the engine weights its rules for this session.")
+    st.header("⚙️ Controls")
     
-    gore_tolerance = st.slider("Gore & Squalor Penalty Weight", min_value=0.0, max_value=2.0, value=1.0, step=0.1, 
-                               help="Higher values make the algorithm mercilessly punish gritty horror.")
-    puzzle_weight = st.slider("Puzzle & Twist Bonus Weight", min_value=0.5, max_value=2.0, value=1.0, step=0.1,
-                              help="Higher values heavily reward intricate narrative structures.")
+    # Feature 2: Collapsed Expander for Tweaking Model
+    with st.expander("🎛️ Tweak Model Weights"):
+        st.write("Customize how the engine weights its rules for this session.")
+        gore_tolerance = st.slider("Gore Penalty Weight", min_value=0.0, max_value=2.0, value=1.0, step=0.1)
+        puzzle_weight = st.slider("Puzzle Bonus Weight", min_value=0.5, max_value=2.0, value=1.0, step=0.1)
     
-    st.markdown("---")
-    st.markdown("**About:** Built on Gemini Flash with real-time OMDb metadata integration.")
+    # Default values if expander isn't touched
+    if 'gore_tolerance' not in locals():
+        gore_tolerance = 1.0
+    if 'puzzle_weight' not in locals():
+        puzzle_weight = 1.0
 
-# Main Input Section wrapped in an st.form (Quota Protection)
+    st.markdown("---")
+    st.markdown("<p style='font-size: 0.85rem;'><b>About:</b> Built on Gemini Flash with real-time OMDb metadata integration.</p>", unsafe_allow_html=True)
+
+# Main Input Section wrapped in an st.form
 col1, col2, col3 = st.columns([1, 2, 1])
 
 with col2:
@@ -169,55 +239,12 @@ with col2:
         if not movie_title:
             st.warning("Please enter a movie title.")
         else:
-            with st.spinner(f"Running {movie_title} through the board (Sliders: Gore x{gore_tolerance}, Puzzle x{puzzle_weight})..."):
+            with st.spinner(f"Analyzing {movie_title}..."):
                 try:
-                    # Dynamic System Prompt injecting user slider weights
-                    system_prompt = f"""
-                    You are a highly rigorous movie scoring algorithm based on the 'Story vs. Gore' scale, possessing a sharp, opinionated personality.
+                    # Calls our cached functions to save daily RPD quota
+                    raw_json = cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight)
+                    data = json.loads(raw_json)
                     
-                    USER CALIBRATION MODIFIERS:
-                    - Squalor Penalty Multiplier: {gore_tolerance} (Scale the Rule 2 deductions by this factor).
-                    - Puzzle Bonus Multiplier: {puzzle_weight} (Scale the Rule 4 bonuses by this factor).
-
-                    SPOILER PROTOCOL (CRITICAL MAXIMUM PRIORITY): 
-                    Never reveal specific plot twists, character deaths, or endings. Speak ONLY in vague, thematic terms.
-
-                    SCORING PARAMETERS:
-                    Start at 5.0 baseline and adjust:
-                    - Rule 1 (Agency): Tactical survival (Add up to +2.5).
-                    - Rule 2 (Squalor/Gore): Body horror/miserable grime (Deduct up to -5.0 * {gore_tolerance}).
-                    - Rule 3 (Payoff): Triumphant victory (Add up to +1.5).
-                    - Rule 4 (Narrative Puzzle): Intricate plot/puzzle (Add up to +2.0 * {puzzle_weight}).
-
-                    EXCEPTIONS:
-                    - Sci-Fi Franchise Armor: Twin Peaks, Alien 3 protected from squalor.
-                    - '12 Monkeys' Rule: Intellectual puzzle nullifies tragic ending penalty (Rule 3), but NEVER squalor (Rule 2).
-
-                    Return ONLY valid JSON matching this schema:
-                    {{
-                      "score": 4.5,
-                      "summary": "Opinionated 2-3 sentence summary with cinematic phrasing.",
-                      "breakdown": [
-                        "**Baseline Score**: 5.0",
-                        "**Rule 1 (Agency)**: Explanation...",
-                        "**Rule 2 (Squalor/Gore)**: Explanation...",
-                        "**Rule 3 (Payoff)**: Explanation...",
-                        "**Rule 4 (Narrative Puzzle)**: Explanation..."
-                      ]
-                    }}
-                    """
-
-                    response = client.models.generate_content(
-                        model='gemini-flash-latest',
-                        contents=movie_title,
-                        config={
-                            'system_instruction': system_prompt,
-                            'temperature': 0.2,
-                            'response_mime_type': 'application/json'
-                        }
-                    )
-                    
-                    data = json.loads(response.text)
                     score_val = float(data.get("score", 5.0))
                     summary_text = data.get("summary", "")
                     breakdown_list = data.get("breakdown", [])
@@ -233,13 +260,11 @@ with col2:
                     else:
                         badge_class = "score-badge-red"
                         
-                    # Render Dual-Column Layout
                     score_col1, score_col2 = st.columns([1, 2.5])
                     
                     with score_col1:
                         st.image(poster_url, use_container_width=True)
                         
-                        # Feature 1: Streaming & Metadata Links
                         search_query = movie_title.replace(" ", "+")
                         st.markdown(f"""
                         <div class="streaming-box">
