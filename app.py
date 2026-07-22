@@ -276,7 +276,6 @@ with st.sidebar:
 # Main Input Section
 col1, col2, col3 = st.columns([1, 2, 1])
 
-# Initialize session state from URL parameters safely
 if "movie_input" not in st.session_state:
     st.session_state.movie_input = st.query_params.get("movie", "")
 
@@ -285,7 +284,6 @@ with col2:
         movie_title = st.text_input("Search for a film...", key="movie_input", placeholder="e.g., The Matrix, 12 Monkeys", label_visibility="collapsed")
         analyze_btn = st.form_submit_button("Run Algorithm")
 
-    # Handle execution via button click or if session state has a movie
     active_movie = st.session_state.movie_input.strip()
     if analyze_btn or active_movie:
         if analyze_btn:
@@ -314,7 +312,6 @@ with col2:
             summary_text = html.escape(data.get("summary", ""))
             breakdown_list = [html.escape(item) for item in data.get("breakdown", [])]
             
-            # Regex to rip out just the final quippy verdict for the share card
             verdict_match = re.search(r"(You should .*? this movie because.*)", summary_text, re.IGNORECASE)
             short_summary = verdict_match.group(1) if verdict_match else summary_text.split('.')[-2] + "."
             
@@ -358,7 +355,7 @@ with col2:
 </ul>
 </div>""", unsafe_allow_html=True)
 
-                # --- SHARE CARD WITH POSTER BACKGROUND & FALLBACK ---
+                # --- SHARE CARD WITH UNPKG CDN AND 3-SECOND TIMEOUT FALLBACK ---
                 with st.expander("✨ Generate Shareable Verdict Card", expanded=True):
                     wrapped_export_html = f"""
                     <!DOCTYPE html>
@@ -500,20 +497,31 @@ with col2:
                     
                     <button class="download-btn" id="dl-button" disabled>⏳ Loading Engine...</button>
 
-                    <script src="[https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js](https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js)"></script>
+                    <!-- Switched to unpkg CDN for reliable sandbox loading -->
+                    <script src="[https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js](https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js)"></script>
                     <script>
+                    const btn = document.getElementById('dl-button');
+                    
+                    // Check library load status with a 3-second safety fallback timeout
                     const checkLib = setInterval(() => {{
                         if (typeof html2canvas !== 'undefined') {{
-                            const btn = document.getElementById('dl-button');
                             btn.disabled = false;
                             btn.innerText = '📸 Download Image';
                             clearInterval(checkLib);
                         }}
                     }}, 100);
 
+                    // Safety fallback: Force enable button after 3 seconds even if CDN lags
+                    setTimeout(() => {{
+                        if (btn.disabled) {{
+                            btn.disabled = false;
+                            btn.innerText = '📸 Download Image';
+                            clearInterval(checkLib);
+                        }}
+                    }}, 3000);
+
                     function downloadWrapped() {{
                         const target = document.getElementById('wrapped-capture-area');
-                        const btn = document.getElementById('dl-button');
                         
                         if (target) {{
                             btn.innerText = '📸 Generating...';
