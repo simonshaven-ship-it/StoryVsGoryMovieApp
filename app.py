@@ -6,9 +6,10 @@ import json
 import urllib.parse
 import html
 import base64
+import re
 
 # 1. Setup the UI Page
-st.set_page_config(page_title="Story vs. Gore Predictor", page_icon="🎬", layout="wide")
+st.set_page_config(page_title="Story Vs Gory", page_icon="🎬", layout="wide")
 
 # 2. Injecting Custom CSS
 st.markdown("""
@@ -129,8 +130,8 @@ api_key = st.secrets["GEMINI_API_KEY"]
 omdb_key = st.secrets["OMDB_API_KEY"]
 client = genai.Client(api_key=api_key)
 
-# 4. Cached Helper Functions
-@st.cache_data(ttl=86400)
+# 4. Cached Helper Functions (show_spinner=False removes the white bar)
+@st.cache_data(ttl=86400, show_spinner=False)
 def fetch_movie_data(title):
     url = f"https://www.omdbapi.com/?t={title}&apikey={omdb_key}"
     try:
@@ -153,7 +154,7 @@ def fetch_movie_data(title):
         pass
     return "https://via.placeholder.com/300x450.png?text=No+Poster+Found", "https://via.placeholder.com/300x450.png?text=No+Poster+Found", "N/A", "N/A"
 
-@st.cache_data(ttl=86400)
+@st.cache_data(ttl=86400, show_spinner=False)
 def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight, pacing_weight):
     system_prompt = f"""
     You are an unhinged, ultra-witty film critic and ruthless scoring algorithm. Your style is packed with swagger, dark humor, outrageous roasts, and vivid cinematic metaphors (e.g., "grabs a chainsaw and digs a hole underneath them"). Make the user chuckle and wow them with your razor-sharp commentary.
@@ -215,7 +216,7 @@ def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight, pacing_we
     return response.text
 
 # 5. UI Layout & Sidebar Controls
-st.markdown("<h1 style='text-align: center; margin-top: 1rem;'>🎬 The Movie Enjoyment Predictor</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; margin-top: 1rem;'>🎬 Story Vs Gory</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #8b949e; font-size: 1.2rem; margin-bottom: 30px;'>Does your movie survive the algorithm?</p>", unsafe_allow_html=True)
 
 with st.sidebar:
@@ -273,6 +274,10 @@ with col2:
                     summary_text = html.escape(data.get("summary", ""))
                     breakdown_list = [html.escape(item) for item in data.get("breakdown", [])]
                     
+                    # Regex to rip out just the final quippy verdict for the share card
+                    verdict_match = re.search(r"(You should .*? this movie because.*)", summary_text, re.IGNORECASE)
+                    short_summary = verdict_match.group(1) if verdict_match else summary_text.split('.')[-2] + "."
+                    
                     poster_url, poster_b64, rated, genre = fetch_movie_data(movie_title)
                     
                     st.markdown("<br>", unsafe_allow_html=True)
@@ -313,8 +318,8 @@ with col2:
 </ul>
 </div>""", unsafe_allow_html=True)
 
-                        # --- UPGRADED SPOTIFY WRAPPED STYLE EXPORT COMPONENT ---
-                        with st.expander("✨ Generate Spotify-Style Wrapped Card"):
+                        # --- UPGRADED STORY VS GORY SHARE CARD ---
+                        with st.expander("✨ Generate Shareable Verdict Card"):
                             wrapped_export_html = f"""
                             <!DOCTYPE html>
                             <html>
@@ -326,10 +331,16 @@ with col2:
                                 margin: 0; 
                                 padding: 20px; 
                                 font-family: 'Inter', sans-serif; 
-                                background-color: #0d1117; 
+                                background-color: transparent; 
                                 display: flex; 
                                 flex-direction: column; 
                                 align-items: center; 
+                            }}
+                            /* Added container wrapper to prevent HTML2Canvas top-clipping bug */
+                            .capture-wrapper {{
+                                padding: 10px;
+                                background-color: #0d1117;
+                                border-radius: 20px;
                             }}
                             .wrapped-container {{
                                 position: relative;
@@ -337,13 +348,14 @@ with col2:
                                 background-size: cover;
                                 background-position: center;
                                 border: 2px solid #ff4b4b;
-                                border-radius: 20px;
+                                border-radius: 16px;
                                 padding: 40px 30px;
                                 text-align: center;
-                                box-shadow: 0 20px 50px rgba(255, 75, 75, 0.3);
+                                box-shadow: 0 10px 40px rgba(255, 75, 75, 0.2);
                                 width: 100%;
                                 max-width: 380px;
                                 box-sizing: border-box;
+                                overflow: hidden;
                             }}
                             .wrapped-header {{
                                 font-size: 0.85rem;
@@ -367,7 +379,7 @@ with col2:
                                 backdrop-filter: blur(10px);
                                 -webkit-backdrop-filter: blur(10px);
                                 border: 2px solid #ff4b4b;
-                                border-radius: 20px;
+                                border-radius: 16px;
                                 padding: 25px;
                                 margin: 20px 0;
                                 box-shadow: 0 10px 30px rgba(0,0,0,0.5);
@@ -380,13 +392,29 @@ with col2:
                                 text-shadow: 0 0 20px rgba(255, 75, 75, 0.4);
                             }}
                             .wrapped-quote {{
-                                font-size: 1rem;
+                                font-size: 1.1rem;
                                 color: #e6edf3;
                                 font-style: italic;
-                                font-weight: 600;
-                                line-height: 1.5;
+                                font-weight: 700;
+                                line-height: 1.4;
                                 margin-top: 20px;
                                 text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+                            }}
+                            .wrapped-footer {{
+                                margin-top: 35px;
+                                padding-top: 15px;
+                                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                                font-size: 0.75rem;
+                                color: #8b949e;
+                                font-weight: 800;
+                                letter-spacing: 2px;
+                            }}
+                            .wrapped-url {{
+                                font-size: 0.85rem;
+                                color: #58a6ff;
+                                font-weight: 600;
+                                letter-spacing: 0px;
+                                margin-top: 5px;
                             }}
                             .download-btn {{
                                 background: linear-gradient(90deg, #ff4b4b 0%, #ff8f00 100%);
@@ -409,16 +437,21 @@ with col2:
                             </head>
                             <body>
                             
-                            <div id="wrapped-capture-area" class="wrapped-container">
-                                <div class="wrapped-header">Algorithm Verdict</div>
-                                <div class="wrapped-title">{safe_title}</div>
-                                <div class="wrapped-score-box">
-                                    <div style="font-size: 0.75rem; color: #8b949e; margin-bottom: 5px; font-weight: 800; letter-spacing: 1px;">FINAL RATING</div>
-                                    <div class="wrapped-score">{score_val}</div>
-                                    <div style="font-size: 0.85rem; color: #ffffff; font-weight: 800; margin-top: 5px;">/ 10.0</div>
+                            <div class="capture-wrapper" id="wrapped-capture-area">
+                                <div class="wrapped-container">
+                                    <div class="wrapped-header">Algorithm Verdict</div>
+                                    <div class="wrapped-title">{safe_title}</div>
+                                    <div class="wrapped-score-box">
+                                        <div style="font-size: 0.75rem; color: #8b949e; margin-bottom: 5px; font-weight: 800; letter-spacing: 1px;">FINAL RATING</div>
+                                        <div class="wrapped-score">{score_val}</div>
+                                        <div style="font-size: 0.85rem; color: #ffffff; font-weight: 800; margin-top: 5px;">/ 10.0</div>
+                                    </div>
+                                    <div class="wrapped-quote">"{short_summary}"</div>
+                                    <div class="wrapped-footer">
+                                        STORY VS GORY<br>
+                                        <div class="wrapped-url">storyvsgory.app</div>
+                                    </div>
                                 </div>
-                                <div class="wrapped-quote">"{summary_text}"</div>
-                                <div style="margin-top: 30px; font-size: 0.7rem; color: #ff8f00; font-weight: 800; letter-spacing: 2px;">STORY VS. GORE PREDICTOR</div>
                             </div>
                             
                             <button class="download-btn" onclick="downloadWrapped()">📸 Download Image</button>
@@ -429,12 +462,12 @@ with col2:
                                 if (target) {{
                                     html2canvas(target, {{ 
                                         backgroundColor: '#0d1117',
-                                        scale: 3, /* Ultra High-Res Export */
+                                        scale: 3,
                                         useCORS: true,
                                         allowTaint: true
                                     }}).then(canvas => {{
                                         const link = document.createElement('a');
-                                        link.download = '{search_query}_Wrapped.png';
+                                        link.download = 'StoryVsGory_{search_query}.png';
                                         link.href = canvas.toDataURL('image/png');
                                         link.click();
                                     }});
