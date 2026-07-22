@@ -161,7 +161,7 @@ def fetch_movie_data(title):
 @st.cache_data(ttl=86400)
 def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight):
     system_prompt = f"""
-   You are an unhinged, ultra-witty film critic and ruthless scoring algorithm. Your style is packed with swagger, dark humor, outrageous roasts, and vivid cinematic metaphors (e.g., "grabs a chainsaw and digs a hole underneath them"). Make the user chuckle and wow them with your razor-sharp commentary.
+    You are an unhinged, ultra-witty film critic and ruthless scoring algorithm. Your style is packed with swagger, dark humor, outrageous roasts, and vivid cinematic metaphors (e.g., "grabs a chainsaw and digs a hole underneath them"). Make the user chuckle and wow them with your razor-sharp commentary.
 
     CRITICAL TASTE ALIGNMENT:
     You are analyzing films for a viewer who LOVES intricate plots, high-concept narrative puzzles (like 12 Monkeys, Get Out), hyper-competent tactical survival, and triumphant action. 
@@ -181,7 +181,8 @@ def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight):
     - Rule 4 (Narrative Puzzle): Intricate plot, high-concept narrative architecture (Add up to +2.0 * {puzzle_weight}).
 
     EXCEPTIONS & BENCHMARKS (HARD RULES):
-    - The '28 Days Later' Rule: Fast-paced kinetic adrenaline and tactical catharsis (like Jim's third-act operator mode) OVERRIDE squalor penalties. Do not punish adrenaline as torture porn. Score this highly.
+    - The '28 Days Later' Rule: Fast-paced kinetic adrenaline and tactical catharsis OVERRIDE squalor penalties ONLY when true triumph exists (e.g., Jim's operator mode). 
+    - NO SEQUEL ARMOR: Do NOT automatically protect franchise sequels. For example, "28 Years Later: The Bone Temple" abandons tactical triumph for bleak, miserable trauma. It gets ZERO adrenaline protection and must be scored brutally (around a 3.0).
     - Sci-Fi Franchise Armor: Twin Peaks, Alien 3 are protected from squalor penalties.
     - The '12 Monkeys' Rule: Intellectual puzzles nullify tragic ending penalties (Rule 3), but NEVER squalor (Rule 2).
     - Benchmark comparison: Drop witty side-by-side roasts against benchmark horror/action films where fitting.
@@ -252,7 +253,14 @@ with col2:
             with st.spinner(f"Analyzing {movie_title}..."):
                 try:
                     raw_json = cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight)
-                    data = json.loads(raw_json)
+                    
+                    # 1. Clean up accidental markdown formatting the AI sometimes sneaks in
+                    clean_json = raw_json.strip()
+                    if clean_json.startswith("```"):
+                        clean_json = clean_json.strip("`").replace("json\n", "", 1).strip()
+                        
+                    # 2. Parse the JSON
+                    data = json.loads(clean_json)
                     
                     score_val = float(data.get("score", 5.0))
                     summary_text = data.get("summary", "")
@@ -278,7 +286,7 @@ with col2:
                         st.markdown(f"""
                         <div class="streaming-box">
                             <p style="font-size: 0.85rem; color: #8b949e; margin-bottom: 8px;"><b>Rated:</b> {rated} | <b>Genre:</b> {genre}</p>
-                            <a href="https://www.justwatch.com/us/search?q={search_query}" target="_blank" style="color: #58a6ff; text-decoration: none; font-size: 0.9rem; font-weight: 600;">🍿 Find Where to Watch</a>
+                            <a href="[https://www.justwatch.com/us/search?q=](https://www.justwatch.com/us/search?q=){search_query}" target="_blank" style="color: #58a6ff; text-decoration: none; font-size: 0.9rem; font-weight: 600;">🍿 Find Where to Watch</a>
                         </div>
                         """, unsafe_allow_html=True)
                         
@@ -300,6 +308,8 @@ with col2:
                         </div>
                         """, unsafe_allow_html=True)
                         
+                except json.JSONDecodeError:
+                    st.warning("⚠️ The AI got a little too wild with its swagger and broke its own formatting! Please click **'Clear AI Analysis Cache'** in the sidebar and try running it again.")
                 except Exception as e:
                     if "503" in str(e) or "UNAVAILABLE" in str(e):
                         st.warning("⚠️ The movie algorithm backend is currently experiencing heavy traffic. Please give it a moment and try running it again!")
