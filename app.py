@@ -6,7 +6,7 @@ import json
 # 1. Setup the UI Page
 st.set_page_config(page_title="Story vs. Gore Predictor", page_icon="🎬", layout="wide")
 
-# 2. Injecting Custom CSS (Fixing Sidebar Contrast & Form Button Styling)
+# 2. Injecting Custom CSS
 st.markdown("""
 <style>
 /* Main Dark Theme */
@@ -44,7 +44,7 @@ h1, h2, h3 {
     padding: 12px;
 }
 
-/* Styling BOTH standard buttons and Form Submit buttons with the gradient */
+/* Button Styling */
 .stButton > button, div.stFormSubmitButton > button {
     background: linear-gradient(90deg, #ff4b4b 0%, #ff8f00 100%) !important;
     color: white !important;
@@ -143,7 +143,7 @@ api_key = st.secrets["GEMINI_API_KEY"]
 omdb_key = st.secrets["OMDB_API_KEY"]
 client = genai.Client(api_key=api_key)
 
-# 4. Cached Helper Functions (Feature 3: Quota Protection via Caching)
+# 4. Cached Helper Functions (Protected Quota Layer)
 @st.cache_data(ttl=86400)
 def fetch_movie_data(title):
     url = f"http://www.omdbapi.com/?t={title}&apikey={omdb_key}"
@@ -161,14 +161,14 @@ def fetch_movie_data(title):
 @st.cache_data(ttl=86400)
 def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight):
     system_prompt = f"""
-    You are a highly rigorous movie scoring algorithm based on the 'Story vs. Gore' scale, possessing a sharp, opinionated personality.
+    You are a high-end, highly opinionated cinematic critic and scoring algorithm based on the 'Story vs. Gore' scale. Your tone is sharp, dramatic, and brimming with personality.
     
     USER CALIBRATION MODIFIERS:
     - Squalor Penalty Multiplier: {gore_tolerance} (Scale Rule 2 deductions by this factor).
     - Puzzle Bonus Multiplier: {puzzle_weight} (Scale Rule 4 bonuses by this factor).
 
     SPOILER PROTOCOL (CRITICAL MAXIMUM PRIORITY): 
-    Never reveal specific plot twists, character deaths, or endings. Speak ONLY in vague, thematic terms.
+    Never reveal specific plot twists, character deaths, or endings. Speak ONLY in vague, cinematic, thematic terms.
 
     SCORING PARAMETERS:
     Start at 5.0 baseline and adjust:
@@ -184,13 +184,13 @@ def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight):
     Return ONLY valid JSON matching this schema:
     {{
       "score": 4.5,
-      "summary": "Opinionated 2-3 sentence summary with cinematic phrasing.",
+      "summary": "Write a punchy, highly opinionated 2-3 sentence summary using dramatic cinematic phrasing (e.g., 'Lethal Competence', 'Cinematic Biohazard'). Do not sound like a generic robot.",
       "breakdown": [
         "**Baseline Score**: 5.0",
-        "**Rule 1 (Agency)**: Explanation...",
-        "**Rule 2 (Squalor/Gore)**: Explanation...",
-        "**Rule 3 (Payoff)**: Explanation...",
-        "**Rule 4 (Narrative Puzzle)**: Explanation..."
+        "**Rule 1 (Agency)**: Explanation with flavor...",
+        "**Rule 2 (Squalor/Gore)**: Explanation with flavor...",
+        "**Rule 3 (Payoff)**: Explanation with flavor...",
+        "**Rule 4 (Narrative Puzzle)**: Explanation with flavor..."
       ]
     }}
     """
@@ -206,27 +206,31 @@ def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight):
     )
     return response.text
 
-# 5. UI Layout & Collapsed Sidebar Controls
+# 5. UI Layout & Sidebar Controls
 st.markdown("<h1 style='text-align: center; margin-top: 1rem;'>🎬 The Movie Enjoyment Predictor</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #8b949e; font-size: 1.2rem; margin-bottom: 30px;'>Does your movie survive the algorithm?</p>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.header("⚙️ Controls")
     
-    # Feature 2: Collapsed Expander for Tweaking Model
     with st.expander("🎛️ Tweak Model Weights"):
         st.write("Customize how the engine weights its rules for this session.")
         gore_tolerance = st.slider("Gore Penalty Weight", min_value=0.0, max_value=2.0, value=1.0, step=0.1)
         puzzle_weight = st.slider("Puzzle Bonus Weight", min_value=0.5, max_value=2.0, value=1.0, step=0.1)
     
-    # Default values if expander isn't touched
     if 'gore_tolerance' not in locals():
         gore_tolerance = 1.0
     if 'puzzle_weight' not in locals():
         puzzle_weight = 1.0
 
     st.markdown("---")
-    st.markdown("<p style='font-size: 0.85rem;'><b>About:</b> Built on Gemini Flash with real-time OMDb metadata integration.</p>", unsafe_allow_html=True)
+    st.subheader("🧹 Cache Management")
+    if st.button("Clear AI Analysis Cache"):
+        cached_gemini_analysis.clear()
+        st.success("AI analysis cache cleared!")
+
+    st.markdown("---")
+    st.markdown("<p style='font-size: 0.85rem;'><b>About:</b> Built on Gemini Flash-Lite with real-time OMDb integration.</p>", unsafe_allow_html=True)
 
 # Main Input Section wrapped in an st.form
 col1, col2, col3 = st.columns([1, 2, 1])
