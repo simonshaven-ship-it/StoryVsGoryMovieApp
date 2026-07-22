@@ -130,7 +130,7 @@ api_key = st.secrets["GEMINI_API_KEY"]
 omdb_key = st.secrets["OMDB_API_KEY"]
 client = genai.Client(api_key=api_key)
 
-# Universal 80s Slasher Catch-All Background Generator for Share Cards
+# Universal 80s Slasher Catch-All Background Generator
 def get_slasher_card_background():
     svg_code = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 650" width="400" height="650">
       <defs>
@@ -145,15 +145,10 @@ def get_slasher_card_background():
         </linearGradient>
       </defs>
       <rect width="400" height="650" fill="url(#bg)"/>
-      <!-- Retro Synthwave Grid -->
       <path d="M0 480 L400 480 M0 515 L400 515 M0 550 L400 550 M0 585 L400 585 M0 620 L400 620" stroke="#ff4b4b" stroke-width="0.8" opacity="0.25"/>
       <path d="M200 480 L30 650 M200 480 L100 650 M200 480 L200 650 M200 480 L300 650 M200 480 L370 650" stroke="#ff4b4b" stroke-width="0.8" opacity="0.25"/>
-      
-      <!-- Slash Graphic Accents -->
       <path d="M30 20 L380 370" stroke="url(#blood)" stroke-width="6" stroke-linecap="round" opacity="0.2"/>
       <path d="M370 20 L20 370" stroke="url(#blood)" stroke-width="4" stroke-linecap="round" opacity="0.15"/>
-      
-      <!-- Atmospheric Glow Orbs -->
       <circle cx="200" cy="150" r="120" fill="#ff4b4b" opacity="0.08" filter="blur(40px)"/>
       <circle cx="200" cy="450" r="100" fill="#ff8f00" opacity="0.05" filter="blur(40px)"/>
     </svg>"""
@@ -164,16 +159,28 @@ def get_slasher_card_background():
 @st.cache_data(ttl=86400, show_spinner=False)
 def fetch_movie_data(title):
     url = f"https://www.omdbapi.com/?t={title}&apikey={omdb_key}"
+    fallback = get_slasher_card_background()
     try:
         response = requests.get(url).json()
         if response.get("Response") == "True":
-            poster_url = response.get("Poster") if response.get("Poster") != "N/A" else "https://via.placeholder.com/300x450.png?text=No+Poster+Found"
+            poster_url = response.get("Poster")
+            if not poster_url or poster_url == "N/A" or "http" not in poster_url:
+                poster_url = fallback
+                poster_b64 = fallback
+            else:
+                img_resp = requests.get(poster_url)
+                if img_resp.status_code == 200:
+                    b64_img = base64.b64encode(img_resp.content).decode('utf-8')
+                    poster_b64 = f"data:image/jpeg;base64,{b64_img}"
+                else:
+                    poster_b64 = fallback
+            
             rated = response.get("Rated", "N/A")
             genre = response.get("Genre", "N/A")
-            return poster_url, rated, genre
+            return poster_url, poster_b64, rated, genre
     except:
         pass
-    return "https://via.placeholder.com/300x450.png?text=No+Poster+Found", "N/A", "N/A"
+    return fallback, fallback, "N/A", "N/A"
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight, pacing_weight):
@@ -269,30 +276,33 @@ with st.sidebar:
 # Main Input Section
 col1, col2, col3 = st.columns([1, 2, 1])
 
-# Check if a movie was passed in the URL to enable deep linking
-default_movie = st.query_params.get("movie", "")
+# Initialize session state from URL parameters safely
+if "movie_input" not in st.session_state:
+    st.session_state.movie_input = st.query_params.get("movie", "")
 
 with col2:
     with st.form("movie_form"):
-        movie_title = st.text_input("Search for a film...", value=default_movie, placeholder="e.g., The Matrix, 12 Monkeys", label_visibility="collapsed")
+        movie_title = st.text_input("Search for a film...", key="movie_input", placeholder="e.g., The Matrix, 12 Monkeys", label_visibility="collapsed")
         analyze_btn = st.form_submit_button("Run Algorithm")
 
-    # Trigger if button is pressed OR if a movie is present in the URL / text box
-    if analyze_btn or (movie_title and movie_title == default_movie):
-        
-        st.query_params["movie"] = movie_title
-        
-        safe_title = html.escape(movie_title)
-        search_query = urllib.parse.quote_plus(movie_title)
+    # Handle execution via button click or if session state has a movie
+    active_movie = st.session_state.movie_input.strip()
+    if analyze_btn or active_movie:
+        if analyze_btn:
+            # Force update URL query parameter immediately on submit
+            st.query_params["movie"] = active_movie
+            
+        safe_title = html.escape(active_movie)
+        search_query = urllib.parse.quote_plus(active_movie)
 
         progress_box = st.empty()
         
         try:
             progress_box.info(f"🎬 Fetching cinematic data for '{safe_title}'...")
-            poster_url, rated, genre = fetch_movie_data(movie_title)
+            poster_url, poster_b64, rated, genre = fetch_movie_data(active_movie)
             
             progress_box.info("🧠 Booting up the unhinged AI critic...")
-            raw_json = cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight, pacing_weight)
+            raw_json = cached_gemini_analysis(active_movie, gore_tolerance, puzzle_weight, pacing_weight)
             
             progress_box.info("⚙️ Crunching the final Story Vs Gory score...")
             clean_json = raw_json.strip()
