@@ -195,8 +195,9 @@ def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight):
     }}
     """
     
+    # Future-proofed model string below!
     response = client.models.generate_content(
-        model='gemini-3.5-flash-lite',
+        model='gemini-flash-latest',
         contents=movie_title,
         config={
             'system_instruction': system_prompt,
@@ -230,7 +231,7 @@ with st.sidebar:
         st.success("AI analysis cache cleared!")
 
     st.markdown("---")
-    st.markdown("<p style='font-size: 0.85rem;'><b>About:</b> Built on Gemini Flash-Lite with real-time OMDb integration.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 0.85rem;'><b>About:</b> Built on Gemini Flash with real-time OMDb integration.</p>", unsafe_allow_html=True)
 
 # Main Input Section wrapped in an st.form
 col1, col2, col3 = st.columns([1, 2, 1])
@@ -296,4 +297,7 @@ with col2:
                         """, unsafe_allow_html=True)
                         
                 except Exception as e:
-                    st.error(f"An error occurred: {e}")
+                    if "503" in str(e) or "UNAVAILABLE" in str(e):
+                        st.warning("⚠️ The movie algorithm backend is currently experiencing heavy traffic. Please give it a moment and try running it again!")
+                    else:
+                        st.error(f"An error occurred: {e}")
