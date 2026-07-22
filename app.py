@@ -6,7 +6,7 @@ import json
 # 1. Setup the UI Page
 st.set_page_config(page_title="Story vs. Gore Predictor", page_icon="🎬", layout="wide")
 
-# 2. Injecting Custom CSS (Fixing Sidebar Contrast & Styling)
+# 2. Injecting Custom CSS (Fixing Sidebar Contrast & Form Button Styling)
 st.markdown("""
 <style>
 /* Main Dark Theme */
@@ -16,7 +16,7 @@ st.markdown("""
     font-family: 'Inter', sans-serif;
 }
 
-/* Force Sidebar to match dark cinematic aesthetic and fix text readability */
+/* Sidebar Styling & Readability */
 [data-testid="stSidebar"] {
     background-color: #161b22;
     border-right: 1px solid #30363d;
@@ -44,21 +44,22 @@ h1, h2, h3 {
     padding: 12px;
 }
 
-.stButton > button {
-    background: linear-gradient(90deg, #ff4b4b 0%, #ff8f00 100%);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 12px 24px;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    width: 100%;
+/* Styling BOTH standard buttons and Form Submit buttons with the gradient */
+.stButton > button, div.stFormSubmitButton > button {
+    background: linear-gradient(90deg, #ff4b4b 0%, #ff8f00 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 12px 24px !important;
+    font-weight: 600 !important;
+    transition: all 0.3s ease !important;
+    width: 100% !important;
 }
 
-.stButton > button:hover {
+.stButton > button:hover, div.stFormSubmitButton > button:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4);
-    color: white;
+    color: white !important;
 }
 
 .score-badge-red {
@@ -205,7 +206,7 @@ def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight):
     )
     return response.text
 
-# 5. UI Layout & Collapsed Sidebar Controls (Feature 2)
+# 5. UI Layout & Collapsed Sidebar Controls
 st.markdown("<h1 style='text-align: center; margin-top: 1rem;'>🎬 The Movie Enjoyment Predictor</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #8b949e; font-size: 1.2rem; margin-bottom: 30px;'>Does your movie survive the algorithm?</p>", unsafe_allow_html=True)
 
@@ -241,7 +242,6 @@ with col2:
         else:
             with st.spinner(f"Analyzing {movie_title}..."):
                 try:
-                    # Calls our cached functions to save daily RPD quota
                     raw_json = cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight)
                     data = json.loads(raw_json)
                     
