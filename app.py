@@ -1,5 +1,6 @@
 import streamlit as st
 from google import genai
+import requests
 
 # 1. Setup the UI Page
 st.set_page_config(page_title="Story vs. Gore Predictor", page_icon="🎬", layout="wide")
@@ -14,14 +15,12 @@ st.markdown("""
     font-family: 'Inter', sans-serif;
 }
 
-/* Crisp Headers */
 h1, h2, h3 {
     color: #ffffff !important;
     font-weight: 800 !important;
     letter-spacing: -1px;
 }
 
-/* Customizing the text input box */
 .stTextInput > div > div > input {
     background-color: #161b22;
     color: #ffffff;
@@ -30,7 +29,6 @@ h1, h2, h3 {
     padding: 12px;
 }
 
-/* Customizing the main action button with a gradient and hover effect */
 .stButton > button {
     background: linear-gradient(90deg, #ff4b4b 0%, #ff8f00 100%);
     color: white;
@@ -48,39 +46,65 @@ h1, h2, h3 {
     color: white;
 }
 
-/* The result card */
+/* Enhanced Scorecard */
 .result-card {
     background-color: #161b22;
-    border: 1px solid #30363d;
+    border-left: 4px solid #ff4b4b;
     border-radius: 12px;
     padding: 30px;
-    margin-top: 20px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.2);
     color: #e6edf3;
+    height: 100%;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Securely load the API Key and initialize the new Client
+# 3. Securely load API Keys
 api_key = st.secrets["GEMINI_API_KEY"]
+omdb_key = st.secrets["OMDB_API_KEY"]
 client = genai.Client(api_key=api_key)
 
-# 4. The Core System Rules
-system_prompt = """
-You are a movie scoring algorithm based on the 'Story vs. Gore' scale. Evaluate the user's movie against these strict parameters:
-- Rule 1 (Agency): Does the protagonist act with hyper-competence and treat survival like a tactical puzzle? (Reward points).
-- Rule 2 (Squalor): Does the movie feature visceral body horror, miserable lifestyle squalor, or mean-spirited torture? (Deduct massive points. Stylized, theatrical action is exempt).
-- Rule 3 (Payoff): Does the movie end with a triumphant, cathartic victory? (Reward points. Cynical, depressing 'Game Overs' are penalized).
-- Exceptions: A flawless, mind-bending intellectual puzzle overrides a tragic ending (e.g., 12 Monkeys). Franchise lore can act as a shield (e.g., Twin Peaks).
+# 4. Helper Function: Fetch Poster
+def fetch_poster(title):
+    url = f"http://www.omdbapi.com/?t={title}&apikey={omdb_key}"
+    try:
+        response = requests.get(url).json()
+        if response.get("Response") == "True" and response.get("Poster") != "N/A":
+            return response.get("Poster")
+    except:
+        pass
+    return "https://via.placeholder.com/300x450.png?text=No+Poster+Found"
 
-Output a score from 1.0 to 10.0 and a punchy, entertaining explanation breaking down how it passes or fails the 3 Rules. Format with clear bullet points.
+# 5. The Core System Rules
+system_prompt = """
+You are a highly rigorous movie scoring algorithm based on the 'Story vs. Gore' scale. 
+
+SPOILER PROTOCOL (CRITICAL MAXIMUM PRIORITY): 
+You must NEVER reveal specific plot twists, character deaths, true villain identities, or surprise endings. When discussing Rule 3 (Payoff) or Rule 4 (Narrative Puzzle), speak ONLY in vague, thematic terms. You must maintain the exact same mathematical scoring behind the scenes, but strictly sanitize the public explanation.
+
+Start every movie at a baseline score of 5.0 and apply strict mathematical adjustments based on these parameters:
+- Rule 1 (Agency): Does the protagonist act with hyper-competence and treat survival like a tactical puzzle? (Add up to +2.5 points).
+- Rule 2 (Squalor/Gore): Does the movie feature visceral body horror, miserable lifestyle squalor, or mean-spirited torture? (Deduct up to -5.0 points. Stylized action is exempt).
+- Rule 3 (Payoff): Does the movie end with a triumphant, cathartic victory? (Add up to +1.5 points).
+- Rule 4 (Narrative Puzzle): Does the movie feature an intricate plot, high-tension thrills, or a mind-bending narrative puzzle? (Add up to +2.0 points). Clean, straightforward survival without complex narrative dread receives ZERO points here.
+
+EXCEPTIONS & ARMOR (Apply these overrides strictly):
+- Franchise Armor: Deep, established franchise lore shields a movie from squalor or depressing ending deductions (e.g., Twin Peaks and Alien 3 are protected from negative adjustments).
+- The '12 Monkeys' Rule: A flawless, mind-bending intellectual puzzle completely nullifies any penalties for a tragic or cynical ending.
+
+SCORING BENCHMARKS (Do not deviate from this scale):
+- 9.5 to 10.0: Flawless, mind-bending intellectual puzzles with high tension (e.g., 12 Monkeys).
+- 8.0 to 9.0: Masterful tension, sharp agency, intricate plots without extreme squalor (e.g., Get Out, American Psycho, A Quiet Place, Apex).
+- 6.0 to 7.0: Highly competent but straightforward, lacking complex dread or intricate plot puzzles (e.g., The Martian = 6.5).
+- 1.0 to 3.0: Gratuitous gore and squalor with no narrative redemption (e.g., Terrifier = 1.0).
+
+Output a final score from 1.0 to 10.0 and a punchy, entertaining explanation breaking down the math of how it passes or fails the Rules. Format with clear bullet points.
 """
 
-# 5. Header Section
+# 6. UI Layout
 st.markdown("<h1 style='text-align: center; margin-top: 2rem;'>🎬 The Movie Enjoyment Predictor</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #8b949e; font-size: 1.2rem; margin-bottom: 40px;'>Based on the <b>Story vs. Gore</b> scale. Does your movie survive the algorithm?</p>", unsafe_allow_html=True)
 
-# 6. Structural Layout
 col1, col2, col3 = st.columns([1, 2, 1])
 
 with col2:
@@ -93,19 +117,30 @@ with col2:
         else:
             with st.spinner(f"Running {movie_title} through the board..."):
                 try:
-                    # Utilizing the new SDK generate_content method
+                    # 1. Fetch AI Score
                     response = client.models.generate_content(
-                        model='gemini-3.5-flash',
+                        model='gemini-flash-latest',
                         contents=movie_title,
-                        config={'system_instruction': system_prompt}
+                        config={'system_instruction': system_prompt, 'temperature': 0.2}
                     )
                     
-                    # Wrap the AI output in our custom CSS card
-                    st.markdown(f"""
-                    <div class="result-card">
-                        {response.text}
-                    </div>
-                    """, unsafe_allow_html=True)
+                    # 2. Fetch Poster
+                    poster_url = fetch_poster(movie_title)
                     
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    
+                    # 3. Render the Dual-Column Scorecard
+                    score_col1, score_col2 = st.columns([1, 2.5])
+                    
+                    with score_col1:
+                        st.image(poster_url, use_container_width=True)
+                        
+                    with score_col2:
+                        st.markdown(f"""
+                        <div class="result-card">
+                            {response.text}
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
                 except Exception as e:
                     st.error(f"An error occurred: {e}")
