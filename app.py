@@ -130,6 +130,19 @@ api_key = st.secrets["GEMINI_API_KEY"]
 omdb_key = st.secrets["OMDB_API_KEY"]
 client = genai.Client(api_key=api_key)
 
+# Fetch html2canvas library server-side to bypass browser/iframe blocks
+@st.cache_data(ttl=86400)
+def get_html2canvas_library():
+    try:
+        resp = requests.get("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js")
+        if resp.status_code == 200:
+            return resp.text
+    except:
+        pass
+    return ""
+
+INLINE_HTML2CANVAS = get_html2canvas_library()
+
 # 80s Slasher Fallback Background Generator
 def get_slasher_card_background():
     svg_code = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 650" width="400" height="650">
@@ -355,7 +368,7 @@ with col2:
 </ul>
 </div>""", unsafe_allow_html=True)
 
-                # --- SHARE CARD WITH UNPKG CDN AND 3-SECOND TIMEOUT FALLBACK ---
+                # --- SHARE CARD WITH INLINE SERVER-SIDE SCRIPT INJECTION ---
                 with st.expander("✨ Generate Shareable Verdict Card", expanded=True):
                     wrapped_export_html = f"""
                     <!DOCTYPE html>
@@ -495,33 +508,15 @@ with col2:
                         </div>
                     </div>
                     
-                    <button class="download-btn" id="dl-button" disabled>⏳ Loading Engine...</button>
+                    <button class="download-btn" id="dl-button" onclick="downloadWrapped()">📸 Download Image</button>
 
-                    <!-- Switched to unpkg CDN for reliable sandbox loading -->
-                    <script src="[https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js](https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js)"></script>
+                    <!-- Server-side injected inline library script -->
                     <script>
-                    const btn = document.getElementById('dl-button');
-                    
-                    // Check library load status with a 3-second safety fallback timeout
-                    const checkLib = setInterval(() => {{
-                        if (typeof html2canvas !== 'undefined') {{
-                            btn.disabled = false;
-                            btn.innerText = '📸 Download Image';
-                            clearInterval(checkLib);
-                        }}
-                    }}, 100);
-
-                    // Safety fallback: Force enable button after 3 seconds even if CDN lags
-                    setTimeout(() => {{
-                        if (btn.disabled) {{
-                            btn.disabled = false;
-                            btn.innerText = '📸 Download Image';
-                            clearInterval(checkLib);
-                        }}
-                    }}, 3000);
+                    {INLINE_HTML2CANVAS}
 
                     function downloadWrapped() {{
                         const target = document.getElementById('wrapped-capture-area');
+                        const btn = document.getElementById('dl-button');
                         
                         if (target) {{
                             btn.innerText = '📸 Generating...';
