@@ -1,9 +1,11 @@
 import streamlit as st
+import streamlit.components.v1 as components
 from google import genai
 import requests
 import json
 import urllib.parse
 import html
+import base64
 
 # 1. Setup the UI Page
 st.set_page_config(page_title="Story vs. Gore Predictor", page_icon="🎬", layout="wide")
@@ -134,16 +136,25 @@ def fetch_movie_data(title):
     try:
         response = requests.get(url).json()
         if response.get("Response") == "True":
-            poster = response.get("Poster") if response.get("Poster") != "N/A" else "https://via.placeholder.com/300x450.png?text=No+Poster+Found"
+            poster_url = response.get("Poster") if response.get("Poster") != "N/A" else "https://via.placeholder.com/300x450.png?text=No+Poster+Found"
             rated = response.get("Rated", "N/A")
             genre = response.get("Genre", "N/A")
-            return poster, rated, genre
+            
+            # Base64 encode the poster for the CORS-safe html2canvas download
+            if poster_url and poster_url != "N/A" and "http" in poster_url:
+                img_resp = requests.get(poster_url)
+                b64_img = base64.b64encode(img_resp.content).decode('utf-8')
+                poster_b64 = f"data:image/jpeg;base64,{b64_img}"
+            else:
+                poster_b64 = poster_url
+                
+            return poster_url, poster_b64, rated, genre
     except:
         pass
-    return "https://via.placeholder.com/300x450.png?text=No+Poster+Found", "N/A", "N/A"
+    return "https://via.placeholder.com/300x450.png?text=No+Poster+Found", "https://via.placeholder.com/300x450.png?text=No+Poster+Found", "N/A", "N/A"
 
 @st.cache_data(ttl=86400)
-def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight):
+def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight, pacing_weight):
     system_prompt = f"""
     You are an unhinged, ultra-witty film critic and ruthless scoring algorithm. Your style is packed with swagger, dark humor, outrageous roasts, and vivid cinematic metaphors (e.g., "grabs a chainsaw and digs a hole underneath them"). Make the user chuckle and wow them with your razor-sharp commentary.
 
@@ -154,6 +165,7 @@ def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight):
     USER CALIBRATION MODIFIERS:
     - Squalor Penalty Multiplier: {gore_tolerance} (Scale Rule 2 deductions by this factor).
     - Puzzle Bonus Multiplier: {puzzle_weight} (Scale Rule 4 bonuses by this factor).
+    - Pacing Penalty Multiplier: {pacing_weight} (Scale Rule 5 deductions by this factor).
 
     SPOILER PROTOCOL: 
     Never reveal specific plot twists, character deaths, or endings. Speak ONLY in vague, thematic, outrageous terms.
@@ -163,7 +175,7 @@ def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight):
     - Rule 2 (Squalor/Gore): Body horror, miserable grime, biological cruelty. (Deduct up to -5.0 * {gore_tolerance}). 
     - Rule 3 (Payoff): Triumphant victory vs. miserable, soul-crushing trauma loops (Add up to +1.5).
     - Rule 4 (Narrative Puzzle): Intricate plot, high-concept narrative architecture (Add up to +2.0 * {puzzle_weight}).
-    - Rule 5 (Pacing & Runtime Check): Deduct points (up to -2.0) for excessive runtime bloat, slow-burn wandering, or meandering travelogues that kill narrative momentum (e.g., epic fantasies heavy on scenic walking).
+    - Rule 5 (Pacing & Runtime Check): Deduct points (up to -2.0 * {pacing_weight}) for excessive runtime bloat, slow-burn wandering, or meandering travelogues that kill narrative momentum (e.g., epic fantasies heavy on scenic walking).
 
     EXCEPTIONS & BENCHMARKS (THE 'MERIT OVER FRANCHISE' PROTOCOL):
     - NO SEQUEL ARMOR (THE INDEPENDENT MERIT RULE): Judge every single film and sequel entirely on its own independent DNA. Never assume a sequel inherits the score or tone of its predecessor.
@@ -213,11 +225,15 @@ with st.sidebar:
         st.write("Customize how the engine weights its rules for this session.")
         gore_tolerance = st.slider("Gore Penalty Weight", min_value=0.0, max_value=2.0, value=1.0, step=0.1)
         puzzle_weight = st.slider("Puzzle Bonus Weight", min_value=0.5, max_value=2.0, value=1.0, step=0.1)
+        pacing_weight = st.slider("Pacing Penalty Weight", min_value=0.0, max_value=2.0, value=1.0, step=0.1)
+        st.caption("ℹ️ Note: Re-run the algorithm after tweaking sliders to update your results.")
     
     if 'gore_tolerance' not in locals():
         gore_tolerance = 1.0
     if 'puzzle_weight' not in locals():
         puzzle_weight = 1.0
+    if 'pacing_weight' not in locals():
+        pacing_weight = 1.0
 
     st.markdown("---")
     st.subheader("🧹 Cache Management")
@@ -240,13 +256,12 @@ with col2:
         if not movie_title:
             st.warning("Please enter a movie title.")
         else:
-            # Sanitize inputs for safe HTML injection and URL formatting
             safe_title = html.escape(movie_title)
             search_query = urllib.parse.quote_plus(movie_title)
 
             with st.spinner(f"Analyzing {movie_title}..."):
                 try:
-                    raw_json = cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight)
+                    raw_json = cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight, pacing_weight)
                     
                     clean_json = raw_json.strip()
                     if clean_json.startswith("```"):
@@ -258,7 +273,7 @@ with col2:
                     summary_text = html.escape(data.get("summary", ""))
                     breakdown_list = [html.escape(item) for item in data.get("breakdown", [])]
                     
-                    poster_url, rated, genre = fetch_movie_data(movie_title)
+                    poster_url, poster_b64, rated, genre = fetch_movie_data(movie_title)
                     
                     st.markdown("<br>", unsafe_allow_html=True)
                     
@@ -298,70 +313,139 @@ with col2:
 </ul>
 </div>""", unsafe_allow_html=True)
 
-                        # --- STRAVA / SPOTIFY WRAPPED STYLE SHARE CARD ---
-                        with st.expander("✨ View Shareable Wrapped Card"):
-                            st.markdown(f"""
+                        # --- UPGRADED SPOTIFY WRAPPED STYLE EXPORT COMPONENT ---
+                        with st.expander("✨ Generate Spotify-Style Wrapped Card"):
+                            wrapped_export_html = f"""
+                            <!DOCTYPE html>
+                            <html>
+                            <head>
+                            <link href="[https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap)" rel="stylesheet">
+                            <script src="[https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js](https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js)"></script>
                             <style>
+                            body {{ 
+                                margin: 0; 
+                                padding: 20px; 
+                                font-family: 'Inter', sans-serif; 
+                                background-color: #0d1117; 
+                                display: flex; 
+                                flex-direction: column; 
+                                align-items: center; 
+                            }}
                             .wrapped-container {{
-                                background: linear-gradient(135deg, #1f1f1f 0%, #0d1117 100%);
+                                position: relative;
+                                background-image: linear-gradient(to bottom, rgba(13, 17, 23, 0.4), rgba(13, 17, 23, 0.95)), url('{poster_b64}');
+                                background-size: cover;
+                                background-position: center;
                                 border: 2px solid #ff4b4b;
                                 border-radius: 20px;
-                                padding: 30px;
+                                padding: 40px 30px;
                                 text-align: center;
-                                font-family: 'Inter', sans-serif;
-                                box-shadow: 0 12px 40px rgba(255, 75, 75, 0.2);
-                                max-width: 400px;
-                                margin: 20px auto;
+                                box-shadow: 0 20px 50px rgba(255, 75, 75, 0.3);
+                                width: 100%;
+                                max-width: 380px;
+                                box-sizing: border-box;
                             }}
                             .wrapped-header {{
-                                font-size: 0.75rem;
+                                font-size: 0.85rem;
                                 text-transform: uppercase;
-                                letter-spacing: 2px;
+                                letter-spacing: 3px;
                                 color: #ff8f00;
-                                font-weight: 800;
-                                margin-bottom: 10px;
+                                font-weight: 900;
+                                margin-bottom: 15px;
+                                text-shadow: 0 2px 4px rgba(0,0,0,0.8);
                             }}
                             .wrapped-title {{
-                                font-size: 1.6rem;
-                                font-weight: 800;
+                                font-size: 2rem;
+                                font-weight: 900;
                                 color: #ffffff;
-                                margin-bottom: 15px;
+                                margin-bottom: 20px;
+                                line-height: 1.1;
+                                text-shadow: 0 2px 10px rgba(0,0,0,0.8);
                             }}
                             .wrapped-score-box {{
-                                background: rgba(255, 75, 75, 0.1);
-                                border: 1px solid #ff4b4b;
-                                border-radius: 15px;
-                                padding: 15px;
-                                margin: 15px 0;
+                                background: rgba(0, 0, 0, 0.6);
+                                backdrop-filter: blur(10px);
+                                -webkit-backdrop-filter: blur(10px);
+                                border: 2px solid #ff4b4b;
+                                border-radius: 20px;
+                                padding: 25px;
+                                margin: 20px 0;
+                                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
                             }}
                             .wrapped-score {{
-                                font-size: 2.8rem;
+                                font-size: 4.5rem;
                                 font-weight: 900;
                                 color: #ff4b4b;
                                 line-height: 1;
+                                text-shadow: 0 0 20px rgba(255, 75, 75, 0.4);
                             }}
                             .wrapped-quote {{
-                                font-size: 0.9rem;
-                                color: #c9d1d9;
+                                font-size: 1rem;
+                                color: #e6edf3;
                                 font-style: italic;
-                                line-height: 1.4;
-                                margin-top: 15px;
+                                font-weight: 600;
+                                line-height: 1.5;
+                                margin-top: 20px;
+                                text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+                            }}
+                            .download-btn {{
+                                background: linear-gradient(90deg, #ff4b4b 0%, #ff8f00 100%);
+                                color: white;
+                                border: none;
+                                border-radius: 8px;
+                                padding: 14px 28px;
+                                font-weight: 800;
+                                cursor: pointer;
+                                font-size: 1rem;
+                                margin-top: 25px;
+                                font-family: 'Inter', sans-serif;
+                                box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4);
+                                transition: transform 0.2s;
+                            }}
+                            .download-btn:hover {{
+                                transform: translateY(-2px);
                             }}
                             </style>
+                            </head>
+                            <body>
                             
-                            <div class="wrapped-container">
-                                <div class="wrapped-header">Algorithm Verdict Wrapped</div>
+                            <div id="wrapped-capture-area" class="wrapped-container">
+                                <div class="wrapped-header">Algorithm Verdict</div>
                                 <div class="wrapped-title">{safe_title}</div>
                                 <div class="wrapped-score-box">
-                                    <div style="font-size: 0.75rem; color: #8b949e; margin-bottom: 5px;">FINAL ALGORITHM RATING</div>
+                                    <div style="font-size: 0.75rem; color: #8b949e; margin-bottom: 5px; font-weight: 800; letter-spacing: 1px;">FINAL RATING</div>
                                     <div class="wrapped-score">{score_val}</div>
-                                    <div style="font-size: 0.85rem; color: #ffffff; font-weight: 600; margin-top: 5px;">/ 10.0</div>
+                                    <div style="font-size: 0.85rem; color: #ffffff; font-weight: 800; margin-top: 5px;">/ 10.0</div>
                                 </div>
                                 <div class="wrapped-quote">"{summary_text}"</div>
-                                <div style="margin-top: 25px; font-size: 0.7rem; color: #8b949e; letter-spacing: 1px;">STORY VS. GORE PREDICTOR</div>
+                                <div style="margin-top: 30px; font-size: 0.7rem; color: #ff8f00; font-weight: 800; letter-spacing: 2px;">STORY VS. GORE PREDICTOR</div>
                             </div>
-                            """, unsafe_allow_html=True)
-                        
+                            
+                            <button class="download-btn" onclick="downloadWrapped()">📸 Download Image</button>
+
+                            <script>
+                            function downloadWrapped() {{
+                                const target = document.getElementById('wrapped-capture-area');
+                                if (target) {{
+                                    html2canvas(target, {{ 
+                                        backgroundColor: '#0d1117',
+                                        scale: 3, /* Ultra High-Res Export */
+                                        useCORS: true,
+                                        allowTaint: true
+                                    }}).then(canvas => {{
+                                        const link = document.createElement('a');
+                                        link.download = '{search_query}_Wrapped.png';
+                                        link.href = canvas.toDataURL('image/png');
+                                        link.click();
+                                    }});
+                                }}
+                            }}
+                            </script>
+                            </body>
+                            </html>
+                            """
+                            components.html(wrapped_export_html, height=850)
+                            
                 except json.JSONDecodeError:
                     st.warning("⚠️ The AI got a little too wild with its swagger and broke its own formatting! Please click **'Clear AI Analysis Cache'** in the sidebar and try running it again.")
                 except Exception as e:
