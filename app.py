@@ -2,6 +2,8 @@ import streamlit as st
 from google import genai
 import requests
 import json
+import urllib.parse
+import html
 
 # 1. Setup the UI Page
 st.set_page_config(page_title="Story vs. Gore Predictor", page_icon="🎬", layout="wide")
@@ -128,7 +130,7 @@ client = genai.Client(api_key=api_key)
 # 4. Cached Helper Functions
 @st.cache_data(ttl=86400)
 def fetch_movie_data(title):
-    url = f"http://www.omdbapi.com/?t={title}&apikey={omdb_key}"
+    url = f"https://www.omdbapi.com/?t={title}&apikey={omdb_key}"
     try:
         response = requests.get(url).json()
         if response.get("Response") == "True":
@@ -147,7 +149,7 @@ def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight):
 
     CRITICAL TASTE ALIGNMENT:
     You are analyzing films for a viewer who LOVES intricate plots, high-concept narrative puzzles (like 12 Monkeys, Get Out), hyper-competent tactical survival, and triumphant action. 
-    They ABSOLUTELY HATE slow, miserable, stomach-turning torture porn, graphic biological cruelty, and mean-spirited squalor (like Terrifier or Hostel).
+    They ABSOLUTELY HATE slow, miserable, stomach-turning torture porn, graphic biological cruelty, mean-spirited squalor, and bloated travelogues that drag on forever.
 
     USER CALIBRATION MODIFIERS:
     - Squalor Penalty Multiplier: {gore_tolerance} (Scale Rule 2 deductions by this factor).
@@ -161,6 +163,7 @@ def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight):
     - Rule 2 (Squalor/Gore): Body horror, miserable grime, biological cruelty. (Deduct up to -5.0 * {gore_tolerance}). 
     - Rule 3 (Payoff): Triumphant victory vs. miserable, soul-crushing trauma loops (Add up to +1.5).
     - Rule 4 (Narrative Puzzle): Intricate plot, high-concept narrative architecture (Add up to +2.0 * {puzzle_weight}).
+    - Rule 5 (Pacing & Runtime Check): Deduct points (up to -2.0) for excessive runtime bloat, slow-burn wandering, or meandering travelogues that kill narrative momentum (e.g., epic fantasies heavy on scenic walking).
 
     EXCEPTIONS & BENCHMARKS (THE 'MERIT OVER FRANCHISE' PROTOCOL):
     - NO SEQUEL ARMOR (THE INDEPENDENT MERIT RULE): Judge every single film and sequel entirely on its own independent DNA. Never assume a sequel inherits the score or tone of its predecessor.
@@ -170,6 +173,7 @@ def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight):
     - THE DEFIANT SACRIFICE PROTOCOL (THE 'ALIEN 3' RULE): A tragic ending where the protagonist asserts supreme agency (e.g., Ripley's furnace swan-dive) is a MASSIVE WIN. It completely nullifies Rule 3 tragedy penalties and guarantees a strong score (7.5 - 8.0) because the protagonist owned their fate.
     - THE HIGH-CONCEPT EXEMPTION: Do not penalize violence if it serves a profound psychological or atmospheric narrative puzzle. If the violence is a necessary chess piece in a brilliant mind-bender, it is protected.
     - The '12 Monkeys' Rule: Intellectual puzzles nullify tragic ending penalties, but NEVER torture-porn squalor.
+    - CRITICAL CONSENSUS OVERRIDE: Ignore general critical acclaim or Rotten Tomatoes scores. If a universally praised epic drags its feet or features endless travel montages, hammer it with the Pacing Penalty. Conversely, if a panned or niche film matches the tactical, high-concept DNA, reward it.
     - Benchmark comparison: Drop witty side-by-side roasts against benchmark horror/action films where fitting.
 
     Return ONLY valid JSON matching this schema:
@@ -181,7 +185,8 @@ def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight):
         "**Rule 1 (Agency)**: Witty explanation with swagger and colorful insults/praise...",
         "**Rule 2 (Squalor/Gore)**: Brutally funny description of the squalor (or lack thereof)...",
         "**Rule 3 (Payoff)**: Darkly comedic breakdown of the victory or misery...",
-        "**Rule 4 (Narrative Puzzle)**: Sharp, sarcastic commentary on the narrative architecture..."
+        "**Rule 4 (Narrative Puzzle)**: Sharp, sarcastic commentary on the narrative architecture...",
+        "**Rule 5 (Pacing & Runtime)**: Sarcastic commentary on pacing bloat or momentum..."
       ]
     }}
     """
@@ -235,6 +240,10 @@ with col2:
         if not movie_title:
             st.warning("Please enter a movie title.")
         else:
+            # Sanitize inputs for safe HTML injection and URL formatting
+            safe_title = html.escape(movie_title)
+            search_query = urllib.parse.quote_plus(movie_title)
+
             with st.spinner(f"Analyzing {movie_title}..."):
                 try:
                     raw_json = cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight)
@@ -246,8 +255,8 @@ with col2:
                     data = json.loads(clean_json)
                     
                     score_val = float(data.get("score", 5.0))
-                    summary_text = data.get("summary", "")
-                    breakdown_list = data.get("breakdown", [])
+                    summary_text = html.escape(data.get("summary", ""))
+                    breakdown_list = [html.escape(item) for item in data.get("breakdown", [])]
                     
                     poster_url, rated, genre = fetch_movie_data(movie_title)
                     
@@ -265,11 +274,10 @@ with col2:
                     with score_col1:
                         st.image(poster_url, use_container_width=True)
                         
-                        search_query = movie_title.replace(" ", "+")
                         st.markdown(f"""
                         <div class="streaming-box">
                             <p style="font-size: 0.85rem; color: #8b949e; margin-bottom: 8px;"><b>Rated:</b> {rated} | <b>Genre:</b> {genre}</p>
-                            <a href="https://www.justwatch.com/us/search?q={search_query}" target="_blank" style="color: #58a6ff; text-decoration: none; font-size: 0.9rem; font-weight: 600;">🍿 Find Where to Watch</a>
+                            <a href="[https://www.justwatch.com/us/search?q=](https://www.justwatch.com/us/search?q=){search_query}" target="_blank" style="color: #58a6ff; text-decoration: none; font-size: 0.9rem; font-weight: 600;">🍿 Find Where to Watch</a>
                         </div>
                         """, unsafe_allow_html=True)
                         
@@ -290,10 +298,69 @@ with col2:
 </ul>
 </div>""", unsafe_allow_html=True)
 
-                        # Clean copyable summary box for easy sharing
-                        with st.expander("📋 Copy Shareable Verdict Text"):
-                            shareable_payload = f"🎬 Movie Verdict: {movie_title}\n⭐️ System Score: {score_val} / 10.0\n\n{summary_text}"
-                            st.code(shareable_payload, language="text")
+                        # --- STRAVA / SPOTIFY WRAPPED STYLE SHARE CARD ---
+                        with st.expander("✨ View Shareable Wrapped Card"):
+                            st.markdown(f"""
+                            <style>
+                            .wrapped-container {{
+                                background: linear-gradient(135deg, #1f1f1f 0%, #0d1117 100%);
+                                border: 2px solid #ff4b4b;
+                                border-radius: 20px;
+                                padding: 30px;
+                                text-align: center;
+                                font-family: 'Inter', sans-serif;
+                                box-shadow: 0 12px 40px rgba(255, 75, 75, 0.2);
+                                max-width: 400px;
+                                margin: 20px auto;
+                            }}
+                            .wrapped-header {{
+                                font-size: 0.75rem;
+                                text-transform: uppercase;
+                                letter-spacing: 2px;
+                                color: #ff8f00;
+                                font-weight: 800;
+                                margin-bottom: 10px;
+                            }}
+                            .wrapped-title {{
+                                font-size: 1.6rem;
+                                font-weight: 800;
+                                color: #ffffff;
+                                margin-bottom: 15px;
+                            }}
+                            .wrapped-score-box {{
+                                background: rgba(255, 75, 75, 0.1);
+                                border: 1px solid #ff4b4b;
+                                border-radius: 15px;
+                                padding: 15px;
+                                margin: 15px 0;
+                            }}
+                            .wrapped-score {{
+                                font-size: 2.8rem;
+                                font-weight: 900;
+                                color: #ff4b4b;
+                                line-height: 1;
+                            }}
+                            .wrapped-quote {{
+                                font-size: 0.9rem;
+                                color: #c9d1d9;
+                                font-style: italic;
+                                line-height: 1.4;
+                                margin-top: 15px;
+                            }}
+                            </style>
+                            
+                            <div class="wrapped-container">
+                                <div class="wrapped-header">Algorithm Verdict Wrapped</div>
+                                <div class="wrapped-title">{safe_title}</div>
+                                <div class="wrapped-score-box">
+                                    <div style="font-size: 0.75rem; color: #8b949e; margin-bottom: 5px;">FINAL ALGORITHM RATING</div>
+                                    <div class="wrapped-score">{score_val}</div>
+                                    <div style="font-size: 0.85rem; color: #ffffff; font-weight: 600; margin-top: 5px;">/ 10.0</div>
+                                </div>
+                                <div class="wrapped-quote">"{summary_text}"</div>
+                                <div style="margin-top: 25px; font-size: 0.7rem; color: #8b949e; letter-spacing: 1px;">STORY VS. GORE PREDICTOR</div>
+                            </div>
+                            """, unsafe_allow_html=True)
                         
                 except json.JSONDecodeError:
                     st.warning("⚠️ The AI got a little too wild with its swagger and broke its own formatting! Please click **'Clear AI Analysis Cache'** in the sidebar and try running it again.")
