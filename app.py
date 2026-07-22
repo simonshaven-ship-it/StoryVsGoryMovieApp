@@ -208,34 +208,27 @@ with col2:
                     search_query = movie_title.replace(" ", "+")
                     
                     # SINGLE INLINED HTML BLOCK FOR PERFECT EXPORT
-                    result_html = f"""
-                    <div id="verdict-capture-area" style="display: flex; flex-direction: row; gap: 20px; padding: 30px; background-color: #0d1117; border-radius: 12px; border: 1px solid #30363d; font-family: 'Inter', sans-serif;">
-                        
-                        <!-- Left Column (Poster) -->
-                        <div style="flex: 1; min-width: 250px;">
-                            <img src="{poster_b64}" style="width: 100%; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);" crossorigin="anonymous">
-                            <div style="background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 15px; margin-top: 15px; text-align: center;">
-                                <p style="font-size: 0.85rem; color: #8b949e; margin-top: 0; margin-bottom: 8px;"><b>Rated:</b> {rated} | <b>Genre:</b> {genre}</p>
-                                <a href="[https://www.justwatch.com/us/search?q=](https://www.justwatch.com/us/search?q=){search_query}" target="_blank" style="color: #58a6ff; text-decoration: none; font-size: 0.9rem; font-weight: 600;">🍿 Find Where to Watch</a>
-                            </div>
-                        </div>
-                        
-                        <!-- Right Column (Verdict & Breakdown) -->
-                        <div style="flex: 2.5; display: flex; flex-direction: column; gap: 20px;">
-                            <div style="background-color: #161b22; border-radius: 12px; padding: 24px; border: 1px solid #30363d; box-shadow: 0 8px 24px rgba(0,0,0,0.3);">
-                                {badge_html}
-                                <p style="font-size: 1.05rem; line-height: 1.6; margin-bottom: 0; color: #e6edf3;">{summary_text}</p>
-                            </div>
-                            
-                            <div style="background-color: #161b22; border-left: 4px solid #ff4b4b; border-radius: 8px; padding: 24px; border-top: 1px solid #30363d; border-right: 1px solid #30363d; border-bottom: 1px solid #30363d;">
-                                <h4 style="margin-top: 0; margin-bottom: 16px; color: #ffffff;">🔍 Diagnostic Breakdown</h4>
-                                <ul style="margin-bottom: 0; padding-left: 20px;">
-                                    {breakdown_html}
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                    """
+                    result_html = f"""<div id="verdict-capture-area" style="display: flex; flex-direction: row; gap: 20px; padding: 30px; background-color: #0d1117; border-radius: 12px; border: 1px solid #30363d; font-family: 'Inter', sans-serif;">
+<div style="flex: 1; min-width: 250px;">
+<img src="{poster_b64}" style="width: 100%; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);" crossorigin="anonymous">
+<div style="background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 15px; margin-top: 15px; text-align: center;">
+<p style="font-size: 0.85rem; color: #8b949e; margin-top: 0; margin-bottom: 8px;"><b>Rated:</b> {rated} | <b>Genre:</b> {genre}</p>
+<a href="https://www.justwatch.com/us/search?q={search_query}" target="_blank" style="color: #58a6ff; text-decoration: none; font-size: 0.9rem; font-weight: 600;">🍿 Find Where to Watch</a>
+</div>
+</div>
+<div style="flex: 2.5; display: flex; flex-direction: column; gap: 20px;">
+<div style="background-color: #161b22; border-radius: 12px; padding: 24px; border: 1px solid #30363d; box-shadow: 0 8px 24px rgba(0,0,0,0.3);">
+{badge_html}
+<p style="font-size: 1.05rem; line-height: 1.6; margin-bottom: 0; color: #e6edf3;">{summary_text}</p>
+</div>
+<div style="background-color: #161b22; border-left: 4px solid #ff4b4b; border-radius: 8px; padding: 24px; border-top: 1px solid #30363d; border-right: 1px solid #30363d; border-bottom: 1px solid #30363d;">
+<h4 style="margin-top: 0; margin-bottom: 16px; color: #ffffff;">🔍 Diagnostic Breakdown</h4>
+<ul style="margin-bottom: 0; padding-left: 20px;">
+{breakdown_html}
+</ul>
+</div>
+</div>
+</div>"""
                     
                     # Render the HTML block
                     st.markdown("<br>", unsafe_allow_html=True)
