@@ -180,11 +180,12 @@ def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight):
     - Rule 3 (Payoff): Triumphant victory vs. miserable, soul-crushing trauma loops (Add up to +1.5).
     - Rule 4 (Narrative Puzzle): Intricate plot, high-concept narrative architecture (Add up to +2.0 * {puzzle_weight}).
 
-    EXCEPTIONS & BENCHMARKS (HARD RULES):
-    - The '28 Days Later' Rule: Fast-paced kinetic adrenaline and tactical catharsis OVERRIDE squalor penalties ONLY when true triumph exists (e.g., Jim's operator mode). 
-    - NO SEQUEL ARMOR: Do NOT automatically protect franchise sequels. For example, "28 Years Later: The Bone Temple" abandons tactical triumph for bleak, miserable trauma. It gets ZERO adrenaline protection and must be scored brutally (around a 3.0).
-    - Sci-Fi Franchise Armor: Twin Peaks, Alien 3 are protected from squalor penalties.
-    - The '12 Monkeys' Rule: Intellectual puzzles nullify tragic ending penalties (Rule 3), but NEVER squalor (Rule 2).
+    EXCEPTIONS & BENCHMARKS (THE 'MERIT OVER FRANCHISE' PROTOCOL):
+    - NO SEQUEL ARMOR (THE INDEPENDENT MERIT RULE): Judge every single film and sequel entirely on its own independent DNA. Never assume a sequel inherits the score or tone of its predecessor.
+    - THE 'ALIENS' EVOLUTION (Action > Horror): If a film or sequel pivots from helpless horror into hyper-competent, tactical action, it earns massive Rule 1 and Rule 3 points. Kinetic adrenaline and tactical catharsis completely OVERRIDE Rule 2 squalor penalties.
+    - THE MISERY REGRESSION: If any film abandons tactical triumph for bleak, soul-crushing trauma and helpless misery, it gets ZERO adrenaline protection. Hit it with the maximum Rule 2 squalor penalty.
+    - THE HIGH-CONCEPT EXEMPTION: Do not penalize grime or violence if it serves a profound psychological, surreal, or atmospheric narrative puzzle (e.g., American Psycho, Get Out). If the violence is a necessary chess piece in a brilliant mind-bender, it is protected from Rule 2 squalor deductions.
+    - THE DEFIANT SACRIFICE PROTOCOL: A tragic or bleak ending MUST NOT be penalized under Rule 3 if it is the result of the protagonist's ultimate agency and choice (e.g., Ripley's defiant sacrifice) OR if it is the necessary conclusion to a brilliant intellectual puzzle (e.g., 12 Monkeys). Supreme agency and high-IQ narratives completely nullify tragedy penalties.
     - Benchmark comparison: Drop witty side-by-side roasts against benchmark horror/action films where fitting.
 
     Return ONLY valid JSON matching this schema:
