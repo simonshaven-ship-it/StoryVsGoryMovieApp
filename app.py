@@ -182,10 +182,12 @@ def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight):
 
     EXCEPTIONS & BENCHMARKS (THE 'MERIT OVER FRANCHISE' PROTOCOL):
     - NO SEQUEL ARMOR (THE INDEPENDENT MERIT RULE): Judge every single film and sequel entirely on its own independent DNA. Never assume a sequel inherits the score or tone of its predecessor.
-    - THE 'ALIENS' EVOLUTION (Action > Horror): If a film or sequel pivots from helpless horror into hyper-competent, tactical action, it earns massive Rule 1 and Rule 3 points. Kinetic adrenaline and tactical catharsis completely OVERRIDE Rule 2 squalor penalties.
-    - THE MISERY REGRESSION: If any film abandons tactical triumph for bleak, soul-crushing trauma and helpless misery, it gets ZERO adrenaline protection. Hit it with the maximum Rule 2 squalor penalty.
-    - THE HIGH-CONCEPT EXEMPTION: Do not penalize grime or violence if it serves a profound psychological, surreal, or atmospheric narrative puzzle (e.g., American Psycho, Get Out). If the violence is a necessary chess piece in a brilliant mind-bender, it is protected from Rule 2 squalor deductions.
-    - THE DEFIANT SACRIFICE PROTOCOL: A tragic or bleak ending MUST NOT be penalized under Rule 3 if it is the result of the protagonist's ultimate agency and choice (e.g., Ripley's defiant sacrifice) OR if it is the necessary conclusion to a brilliant intellectual puzzle (e.g., 12 Monkeys). Supreme agency and high-IQ narratives completely nullify tragedy penalties.
+    - THE 'ALIENS' EVOLUTION (Action > Horror): If a film pivots from helpless horror into hyper-competent, tactical action, it earns massive Rule 1 and Rule 3 points. Kinetic adrenaline completely OVERRIDES Rule 2 squalor penalties.
+    - THE 'SLOW SLASHER' TAX: If a movie is a slow-burn claustrophobic horror where the cast spends 90% of the runtime helpless, hiding, or dying off (e.g., the original 'Alien'), it gets minimal Rule 1 points. Do not mistake basic final-act survival for tactical warfare. It should score moderately (around 5.0 - 6.0).
+    - ATMOSPHERE VS. TORTURE PORN: Do NOT heavily penalize dirty, industrial, or bleak settings (like the rusty prison in 'Alien 3'). Rule 2 penalties are strictly for mean-spirited biological torture and misery, not environmental grime.
+    - THE DEFIANT SACRIFICE PROTOCOL (THE 'ALIEN 3' RULE): A tragic ending where the protagonist asserts supreme agency (e.g., Ripley's furnace swan-dive) is a MASSIVE WIN. It completely nullifies Rule 3 tragedy penalties and guarantees a strong score (7.5 - 8.0) because the protagonist owned their fate.
+    - THE HIGH-CONCEPT EXEMPTION: Do not penalize violence if it serves a profound psychological or atmospheric narrative puzzle. If the violence is a necessary chess piece in a brilliant mind-bender, it is protected.
+    - The '12 Monkeys' Rule: Intellectual puzzles nullify tragic ending penalties, but NEVER torture-porn squalor.
     - Benchmark comparison: Drop witty side-by-side roasts against benchmark horror/action films where fitting.
 
     Return ONLY valid JSON matching this schema:
