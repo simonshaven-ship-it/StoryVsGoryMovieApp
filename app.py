@@ -2,7 +2,6 @@ import streamlit as st
 from google import genai
 import requests
 import json
-import base64
 
 # 1. Setup the UI Page
 st.set_page_config(page_title="Story vs. Gore Predictor", page_icon="🎬", layout="wide")
@@ -270,7 +269,7 @@ with col2:
                         st.markdown(f"""
                         <div class="streaming-box">
                             <p style="font-size: 0.85rem; color: #8b949e; margin-bottom: 8px;"><b>Rated:</b> {rated} | <b>Genre:</b> {genre}</p>
-                            <a href="[https://www.justwatch.com/us/search?q=](https://www.justwatch.com/us/search?q=){search_query}" target="_blank" style="color: #58a6ff; text-decoration: none; font-size: 0.9rem; font-weight: 600;">🍿 Find Where to Watch</a>
+                            <a href="https://www.justwatch.com/us/search?q={search_query}" target="_blank" style="color: #58a6ff; text-decoration: none; font-size: 0.9rem; font-weight: 600;">🍿 Find Where to Watch</a>
                         </div>
                         """, unsafe_allow_html=True)
                         
@@ -291,14 +290,10 @@ with col2:
 </ul>
 </div>""", unsafe_allow_html=True)
 
-                        # Provide a clean text download button for the verdict
-                        report_text = f"MOVIE VERDICT: {movie_title}\nSYSTEM SCORE: {score_val} / 10.0\n\nSUMMARY:\n{summary_text}\n\nBREAKDOWN:\n" + "\n".join(breakdown_list)
-                        st.download_button(
-                            label="📥 Download Verdict Report",
-                            data=report_text,
-                            file_name=f"{movie_title.replace(' ', '_')}_Verdict.txt",
-                            mime="text/plain"
-                        )
+                        # Clean copyable summary box for easy sharing
+                        with st.expander("📋 Copy Shareable Verdict Text"):
+                            shareable_payload = f"🎬 Movie Verdict: {movie_title}\n⭐️ System Score: {score_val} / 10.0\n\n{summary_text}"
+                            st.code(shareable_payload, language="text")
                         
                 except json.JSONDecodeError:
                     st.warning("⚠️ The AI got a little too wild with its swagger and broke its own formatting! Please click **'Clear AI Analysis Cache'** in the sidebar and try running it again.")
