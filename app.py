@@ -324,8 +324,7 @@ with col2:
                             <!DOCTYPE html>
                             <html>
                             <head>
-                            <link href="[https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap)" rel="stylesheet">
-                            <script src="[https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js](https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js)"></script>
+                            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
                             <style>
                             body {{ 
                                 margin: 0; 
@@ -336,7 +335,6 @@ with col2:
                                 flex-direction: column; 
                                 align-items: center; 
                             }}
-                            /* Added container wrapper to prevent HTML2Canvas top-clipping bug */
                             .capture-wrapper {{
                                 padding: 10px;
                                 background-color: #0d1117;
@@ -454,12 +452,26 @@ with col2:
                                 </div>
                             </div>
                             
-                            <button class="download-btn" onclick="downloadWrapped()">📸 Download Image</button>
+                            <button class="download-btn" id="dl-button" onclick="downloadWrapped()">📸 Download Image</button>
 
+                            <!-- Moved script to body and using jsDelivr -->
+                            <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
                             <script>
                             function downloadWrapped() {{
+                                // Safety check to ensure library is loaded
+                                if (typeof html2canvas === 'undefined') {{
+                                    alert('The image engine is still loading! Please try clicking again in a moment.');
+                                    return;
+                                }}
+                                
                                 const target = document.getElementById('wrapped-capture-area');
+                                const btn = document.getElementById('dl-button');
+                                
                                 if (target) {{
+                                    // Visual feedback that it is working
+                                    btn.innerText = '📸 Generating...';
+                                    btn.style.opacity = '0.7';
+                                    
                                     html2canvas(target, {{ 
                                         backgroundColor: '#0d1117',
                                         scale: 3,
@@ -470,6 +482,14 @@ with col2:
                                         link.download = 'StoryVsGory_{search_query}.png';
                                         link.href = canvas.toDataURL('image/png');
                                         link.click();
+                                        
+                                        // Reset button
+                                        btn.innerText = '📸 Download Image';
+                                        btn.style.opacity = '1';
+                                    }}).catch(err => {{
+                                        console.error('Error generating image:', err);
+                                        btn.innerText = '❌ Error - Try Again';
+                                        btn.style.opacity = '1';
                                     }});
                                 }}
                             }}
