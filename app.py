@@ -265,10 +265,16 @@ with col2:
         safe_title = html.escape(movie_title)
         search_query = urllib.parse.quote_plus(movie_title)
 
-        with st.spinner(f"Analyzing {movie_title}..."):
+        # Dynamic "Thinking" sequence replaces the static spinner
+        with st.status(f"Analyzing '{safe_title}'...", expanded=True) as status:
             try:
+                st.write("🎬 Fetching cinematic data...")
+                poster_url, poster_b64, rated, genre = fetch_movie_data(movie_title)
+                
+                st.write("🧠 Booting up the unhinged AI critic...")
                 raw_json = cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight, pacing_weight)
                 
+                st.write("⚙️ Crunching the final Story Vs Gory score...")
                 clean_json = raw_json.strip()
                 if clean_json.startswith("```"):
                     clean_json = clean_json.strip("`").replace("json\n", "", 1).strip()
@@ -283,8 +289,7 @@ with col2:
                 verdict_match = re.search(r"(You should .*? this movie because.*)", summary_text, re.IGNORECASE)
                 short_summary = verdict_match.group(1) if verdict_match else summary_text.split('.')[-2] + "."
                 
-                poster_url, poster_b64, rated, genre = fetch_movie_data(movie_title)
-                
+                status.update(label=f"Verdict complete for {safe_title}!", state="complete", expanded=False)
                 st.markdown("<br>", unsafe_allow_html=True)
                 
                 if score_val >= 8.0:
@@ -453,7 +458,7 @@ with col2:
                                 <div class="wrapped-quote">"{short_summary}"</div>
                                 <div class="wrapped-footer">
                                     STORY VS GORY<br>
-                                    <div class="wrapped-url">storyvsgorymovierater.streamlit.app</div>
+                                    <div class="wrapped-url">storyvsgorymovierater.streamlit.app/?movie={search_query}</div>
                                 </div>
                             </div>
                         </div>
@@ -506,8 +511,10 @@ with col2:
                         components.html(wrapped_export_html, height=850)
                         
             except json.JSONDecodeError:
+                status.update(label="Oops, algorithm got confused!", state="error", expanded=True)
                 st.warning("⚠️ The AI got a little too wild with its swagger and broke its own formatting! Please click **'Clear AI Analysis Cache'** in the sidebar and try running it again.")
             except Exception as e:
+                status.update(label="System Error", state="error", expanded=True)
                 if "503" in str(e) or "UNAVAILABLE" in str(e):
                     st.warning("⚠️ The movie algorithm backend is currently experiencing heavy traffic. Please give it a moment and try running it again!")
                 else:
