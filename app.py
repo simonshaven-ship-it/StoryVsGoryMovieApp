@@ -143,7 +143,21 @@ api_key = st.secrets["GEMINI_API_KEY"]
 omdb_key = st.secrets["OMDB_API_KEY"]
 client = genai.Client(api_key=api_key)
 
-# 4. Cached Helper Functions (Protected Quota Layer)
+# 4. Cached Helper Functions
+@st.cache_data(ttl=86400)
+def fetch_movie_data(title):
+    url = f"http://www.omdbapi.com/?t={title}&apikey={omdb_key}"
+    try:
+        response = requests.get(url).json()
+        if response.get("Response") == "True":
+            poster = response.get("Poster") if response.get("Poster") != "N/A" else "https://via.placeholder.com/300x450.png?text=No+Poster+Found"
+            rated = response.get("Rated", "N/A")
+            genre = response.get("Genre", "N/A")
+            return poster, rated, genre
+    except:
+        pass
+    return "https://via.placeholder.com/300x450.png?text=No+Poster+Found", "N/A", "N/A"
+
 @st.cache_data(ttl=86400)
 def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight):
     system_prompt = f"""
@@ -188,12 +202,12 @@ def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight):
         contents=movie_title,
         config={
             'system_instruction': system_prompt,
-            'temperature': 0.75,  # Unlocks creativity, humor, and prose swagger
+            'temperature': 0.75,
             'response_mime_type': 'application/json'
         }
     )
     return response.text
-    
+
 # 5. UI Layout & Sidebar Controls
 st.markdown("<h1 style='text-align: center; margin-top: 1rem;'>🎬 The Movie Enjoyment Predictor</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #8b949e; font-size: 1.2rem; margin-bottom: 30px;'>Does your movie survive the algorithm?</p>", unsafe_allow_html=True)
