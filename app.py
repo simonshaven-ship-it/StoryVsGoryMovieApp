@@ -302,14 +302,13 @@ with col2:
                         """, unsafe_allow_html=True)
                         
                         breakdown_html = "".join([f"<li>{item}</li>" for item in breakdown_list])
-                        st.markdown(f"""
-                        <div class="breakdown-card">
-                            <h4 style="margin-top: 0; margin-bottom: 16px; color: #ffffff;">🔍 Diagnostic Breakdown</h4>
-                            <ul>
-                                {breakdown_html}
-                            </ul>
-                        </div>
-                        """, unsafe_allow_html=True)
+                        
+                        st.markdown(f"""<div class="breakdown-card">
+<h4 style="margin-top: 0; margin-bottom: 16px; color: #ffffff;">🔍 Diagnostic Breakdown</h4>
+<ul>
+{breakdown_html}
+</ul>
+</div>""", unsafe_allow_html=True)
                         
                 except json.JSONDecodeError:
                     st.warning("⚠️ The AI got a little too wild with its swagger and broke its own formatting! Please click **'Clear AI Analysis Cache'** in the sidebar and try running it again.")
