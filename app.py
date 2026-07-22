@@ -359,181 +359,192 @@ with col2:
 </div>""", unsafe_allow_html=True)
 
                 # --- SHARE CARD WITH POSTER BACKGROUND & FALLBACK ---
-                with st.expander("✨ Generate Shareable Verdict Card", expanded=True):
-                    wrapped_export_html = f"""
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                    <link href="[https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap)" rel="stylesheet">
-                    <style>
-                    body {{ 
-                        margin: 0; 
-                        padding: 20px; 
-                        font-family: 'Inter', sans-serif; 
-                        background-color: transparent; 
-                        display: flex; 
-                        flex-direction: column; 
-                        align-items: center; 
-                    }}
-                    .capture-wrapper {{
-                        padding: 10px;
-                        background-color: #0d1117;
-                        border-radius: 20px;
-                    }}
-                    .wrapped-container {{
-                        position: relative;
-                        background-image: linear-gradient(to bottom, rgba(13, 17, 23, 0.4), rgba(13, 17, 23, 0.95)), url('{poster_b64}');
-                        background-size: cover;
-                        background-position: center;
-                        border: 2px solid #ff4b4b;
-                        border-radius: 16px;
-                        padding: 40px 30px;
-                        text-align: center;
-                        box-shadow: 0 10px 40px rgba(255, 75, 75, 0.2);
-                        width: 100%;
-                        max-width: 380px;
-                        box-sizing: border-box;
-                        overflow: hidden;
-                    }}
-                    .wrapped-header {{
-                        font-size: 0.85rem;
-                        text-transform: uppercase;
-                        letter-spacing: 3px;
-                        color: #ff8f00;
-                        font-weight: 900;
-                        margin-bottom: 15px;
-                        text-shadow: 0 2px 4px rgba(0,0,0,0.8);
-                    }}
-                    .wrapped-title {{
-                        font-size: 2rem;
-                        font-weight: 900;
-                        color: #ffffff;
-                        margin-bottom: 20px;
-                        line-height: 1.1;
-                        text-shadow: 0 2px 10px rgba(0,0,0,0.8);
-                    }}
-                    .wrapped-score-box {{
-                        background: rgba(0, 0, 0, 0.75);
-                        backdrop-filter: blur(10px);
-                        -webkit-backdrop-filter: blur(10px);
-                        border: 2px solid #ff4b4b;
-                        border-radius: 16px;
-                        padding: 25px;
-                        margin: 20px 0;
-                        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-                    }}
-                    .wrapped-score {{
-                        font-size: 4.5rem;
-                        font-weight: 900;
-                        color: #ff4b4b;
-                        line-height: 1;
-                        text-shadow: 0 0 20px rgba(255, 75, 75, 0.4);
-                    }}
-                    .wrapped-quote {{
-                        font-size: 1.1rem;
-                        color: #e6edf3;
-                        font-style: italic;
-                        font-weight: 700;
-                        line-height: 1.4;
-                        margin-top: 20px;
-                        text-shadow: 0 2px 5px rgba(0,0,0,0.8);
-                    }}
-                    .wrapped-footer {{
-                        margin-top: 35px;
-                        padding-top: 15px;
-                        border-top: 1px solid rgba(255, 255, 255, 0.1);
-                        font-size: 0.75rem;
-                        color: #8b949e;
-                        font-weight: 800;
-                        letter-spacing: 2px;
-                    }}
-                    .wrapped-url {{
-                        font-size: 0.85rem;
-                        color: #58a6ff;
-                        font-weight: 600;
-                        letter-spacing: 0px;
-                        margin-top: 5px;
-                    }}
-                    .download-btn {{
-                        background: linear-gradient(90deg, #ff4b4b 0%, #ff8f00 100%);
-                        color: white;
-                        border: none;
-                        border-radius: 8px;
-                        padding: 14px 28px;
-                        font-weight: 800;
-                        cursor: pointer;
-                        font-size: 1rem;
-                        margin-top: 25px;
-                        font-family: 'Inter', sans-serif;
-                        box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4);
-                        transition: transform 0.2s;
-                    }}
-                    .download-btn:hover {{
-                        transform: translateY(-2px);
-                    }}
-                    </style>
-                    </head>
-                    <body>
-                    
-                    <div class="capture-wrapper" id="wrapped-capture-area">
-                        <div class="wrapped-container">
-                            <div class="wrapped-header">Algorithm Verdict</div>
-                            <div class="wrapped-title">{safe_title}</div>
-                            <div class="wrapped-score-box">
-                                <div style="font-size: 0.75rem; color: #8b949e; margin-bottom: 5px; font-weight: 800; letter-spacing: 1px;">FINAL RATING</div>
-                                <div class="wrapped-score">{score_val}</div>
-                                <div style="font-size: 0.85rem; color: #ffffff; font-weight: 800; margin-top: 5px;">/ 10.0</div>
-                            </div>
-                            <div class="wrapped-quote">"{short_summary}"</div>
-                            <div class="wrapped-footer">
-                                STORY VS GORY<br>
-                                <div class="wrapped-url">storyvsgorymovierater.streamlit.app/?movie={search_query}</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <button class="download-btn" id="dl-button" onclick="downloadWrapped()">📸 Download Image</button>
-
-                    <script src="[https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js](https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js)"></script>
-                    <script>
-                    function downloadWrapped() {{
-                        if (typeof html2canvas === 'undefined') {{
-                            alert('The image engine is still loading! Please try clicking again in a moment.');
-                            return;
-                        }}
-                        
-                        const target = document.getElementById('wrapped-capture-area');
-                        const btn = document.getElementById('dl-button');
-                        
-                        if (target) {{
-                            btn.innerText = '📸 Generating...';
-                            btn.style.opacity = '0.7';
+                        with st.expander("✨ Generate Shareable Verdict Card", expanded=True):
+                            wrapped_export_html = f"""
+                            <!DOCTYPE html>
+                            <html>
+                            <head>
+                            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+                            <style>
+                            body {{ 
+                                margin: 0; 
+                                padding: 20px; 
+                                font-family: 'Inter', sans-serif; 
+                                background-color: transparent; 
+                                display: flex; 
+                                flex-direction: column; 
+                                align-items: center; 
+                            }}
+                            .capture-wrapper {{
+                                padding: 10px;
+                                background-color: #0d1117;
+                                border-radius: 20px;
+                            }}
+                            .wrapped-container {{
+                                position: relative;
+                                background-image: linear-gradient(to bottom, rgba(13, 17, 23, 0.4), rgba(13, 17, 23, 0.95)), url('{poster_b64}');
+                                background-size: cover;
+                                background-position: center;
+                                border: 2px solid #ff4b4b;
+                                border-radius: 16px;
+                                padding: 40px 30px;
+                                text-align: center;
+                                box-shadow: 0 10px 40px rgba(255, 75, 75, 0.2);
+                                width: 100%;
+                                max-width: 380px;
+                                box-sizing: border-box;
+                                overflow: hidden;
+                            }}
+                            .wrapped-header {{
+                                font-size: 0.85rem;
+                                text-transform: uppercase;
+                                letter-spacing: 3px;
+                                color: #ff8f00;
+                                font-weight: 900;
+                                margin-bottom: 15px;
+                                text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+                            }}
+                            .wrapped-title {{
+                                font-size: 2rem;
+                                font-weight: 900;
+                                color: #ffffff;
+                                margin-bottom: 20px;
+                                line-height: 1.1;
+                                text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+                            }}
+                            .wrapped-score-box {{
+                                background: rgba(0, 0, 0, 0.75);
+                                backdrop-filter: blur(10px);
+                                -webkit-backdrop-filter: blur(10px);
+                                border: 2px solid #ff4b4b;
+                                border-radius: 16px;
+                                padding: 25px;
+                                margin: 20px 0;
+                                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                            }}
+                            .wrapped-score {{
+                                font-size: 4.5rem;
+                                font-weight: 900;
+                                color: #ff4b4b;
+                                line-height: 1;
+                                text-shadow: 0 0 20px rgba(255, 75, 75, 0.4);
+                            }}
+                            .wrapped-quote {{
+                                font-size: 1.1rem;
+                                color: #e6edf3;
+                                font-style: italic;
+                                font-weight: 700;
+                                line-height: 1.4;
+                                margin-top: 20px;
+                                text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+                            }}
+                            .wrapped-footer {{
+                                margin-top: 35px;
+                                padding-top: 15px;
+                                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                                font-size: 0.75rem;
+                                color: #8b949e;
+                                font-weight: 800;
+                                letter-spacing: 2px;
+                            }}
+                            .wrapped-url {{
+                                font-size: 0.85rem;
+                                color: #58a6ff;
+                                font-weight: 600;
+                                letter-spacing: 0px;
+                                margin-top: 5px;
+                            }}
+                            .download-btn {{
+                                background: linear-gradient(90deg, #ff4b4b 0%, #ff8f00 100%);
+                                color: white;
+                                border: none;
+                                border-radius: 8px;
+                                padding: 14px 28px;
+                                font-weight: 800;
+                                cursor: pointer;
+                                font-size: 1rem;
+                                margin-top: 25px;
+                                font-family: 'Inter', sans-serif;
+                                box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4);
+                                transition: transform 0.2s;
+                            }}
+                            .download-btn:disabled {{
+                                background: #30363d;
+                                color: #8b949e;
+                                cursor: not-allowed;
+                                box-shadow: none;
+                            }}
+                            .download-btn:hover:not(:disabled) {{
+                                transform: translateY(-2px);
+                            }}
+                            </style>
+                            </head>
+                            <body>
                             
-                            html2canvas(target, {{ 
-                                backgroundColor: '#0d1117',
-                                scale: 3,
-                                useCORS: true,
-                                allowTaint: true
-                            }}).then(canvas => {{
-                                const link = document.createElement('a');
-                                link.download = 'StoryVsGory_{search_query}.png';
-                                link.href = canvas.toDataURL('image/png');
-                                link.click();
+                            <div class="capture-wrapper" id="wrapped-capture-area">
+                                <div class="wrapped-container">
+                                    <div class="wrapped-header">Algorithm Verdict</div>
+                                    <div class="wrapped-title">{safe_title}</div>
+                                    <div class="wrapped-score-box">
+                                        <div style="font-size: 0.75rem; color: #8b949e; margin-bottom: 5px; font-weight: 800; letter-spacing: 1px;">FINAL RATING</div>
+                                        <div class="wrapped-score">{score_val}</div>
+                                        <div style="font-size: 0.85rem; color: #ffffff; font-weight: 800; margin-top: 5px;">/ 10.0</div>
+                                    </div>
+                                    <div class="wrapped-quote">"{short_summary}"</div>
+                                    <div class="wrapped-footer">
+                                        STORY VS GORY<br>
+                                        <div class="wrapped-url">storyvsgorymovierater.streamlit.app/?movie={search_query}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button class="download-btn" id="dl-button" disabled>⏳ Loading Engine...</button>
+
+                            <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+                            <script>
+                            // Automatically enable button the moment html2canvas is ready
+                            const checkLib = setInterval(() => {{
+                                if (typeof html2canvas !== 'undefined') {{
+                                    const btn = document.getElementById('dl-button');
+                                    btn.disabled = false;
+                                    btn.innerText = '📸 Download Image';
+                                    clearInterval(checkLib);
+                                }}
+                            }}, 100);
+
+                            function downloadWrapped() {{
+                                const target = document.getElementById('wrapped-capture-area');
+                                const btn = document.getElementById('dl-button');
                                 
-                                btn.innerText = '📸 Download Image';
-                                btn.style.opacity = '1';
-                            }}).catch(err => {{
-                                console.error('Error generating image:', err);
-                                btn.innerText = '❌ Error - Try Again';
-                                btn.style.opacity = '1';
-                            }});
-                        }}
-                    }}
-                    </script>
-                    </body>
-                    </html>
-                    """
-                    components.html(wrapped_export_html, height=850)
+                                if (target) {{
+                                    btn.innerText = '📸 Generating...';
+                                    btn.style.opacity = '0.7';
+                                    
+                                    html2canvas(target, {{ 
+                                        backgroundColor: '#0d1117',
+                                        scale: 3,
+                                        useCORS: true,
+                                        allowTaint: true
+                                    }}).then(canvas => {{
+                                        const link = document.createElement('a');
+                                        link.download = 'StoryVsGory_{search_query}.png';
+                                        link.href = canvas.toDataURL('image/png');
+                                        link.click();
+                                        
+                                        btn.innerText = '📸 Download Image';
+                                        btn.style.opacity = '1';
+                                    }}).catch(err => {{
+                                        console.error('Error generating image:', err);
+                                        btn.innerText = '❌ Error - Try Again';
+                                        btn.style.opacity = '1';
+                                    }});
+                                }}
+                            }}
+                            </script>
+                            </body>
+                            </html>
+                            """
+                            components.html(wrapped_export_html, height=850)
                     
         except json.JSONDecodeError:
             progress_box.empty()
