@@ -145,68 +145,55 @@ client = genai.Client(api_key=api_key)
 
 # 4. Cached Helper Functions (Protected Quota Layer)
 @st.cache_data(ttl=86400)
-def fetch_movie_data(title):
-    url = f"http://www.omdbapi.com/?t={title}&apikey={omdb_key}"
-    try:
-        response = requests.get(url).json()
-        if response.get("Response") == "True":
-            poster = response.get("Poster") if response.get("Poster") != "N/A" else "https://via.placeholder.com/300x450.png?text=No+Poster+Found"
-            rated = response.get("Rated", "N/A")
-            genre = response.get("Genre", "N/A")
-            return poster, rated, genre
-    except:
-        pass
-    return "https://via.placeholder.com/300x450.png?text=No+Poster+Found", "N/A", "N/A"
-
-@st.cache_data(ttl=86400)
 def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight):
     system_prompt = f"""
-    You are a high-end, highly opinionated cinematic critic and scoring algorithm based on the 'Story vs. Gore' scale. Your tone is sharp, dramatic, and brimming with personality.
-    
+    You are an unhinged, ultra-witty film critic and ruthless scoring algorithm operating on the strict 'Story vs. Gore' scale. 
+    Your style is packed with swagger, dark humor, outrageous roasts, and vivid cinematic metaphors (e.g., "grabs a chainsaw and digs a hole underneath them", "a nuclear detonation on your board"). Make the user chuckle and wow them with your razor-sharp commentary.
+
     USER CALIBRATION MODIFIERS:
     - Squalor Penalty Multiplier: {gore_tolerance} (Scale Rule 2 deductions by this factor).
     - Puzzle Bonus Multiplier: {puzzle_weight} (Scale Rule 4 bonuses by this factor).
 
     SPOILER PROTOCOL (CRITICAL MAXIMUM PRIORITY): 
-    Never reveal specific plot twists, character deaths, or endings. Speak ONLY in vague, cinematic, thematic terms.
+    Never reveal specific plot twists, character deaths, or endings. Speak ONLY in vague, thematic, outrageous terms.
 
     SCORING PARAMETERS:
     Start at 5.0 baseline and adjust:
-    - Rule 1 (Agency): Tactical survival (Add up to +2.5).
-    - Rule 2 (Squalor/Gore): Body horror/miserable grime (Deduct up to -5.0 * {gore_tolerance}).
-    - Rule 3 (Payoff): Triumphant victory (Add up to +1.5).
-    - Rule 4 (Narrative Puzzle): Intricate plot/puzzle (Add up to +2.0 * {puzzle_weight}).
+    - Rule 1 (Agency): Tactical survival, hyper-competence, improvised blueprints (Add up to +2.5).
+    - Rule 2 (Squalor/Gore): Body horror, miserable grime, biological cruelty, stomach-turning gore (Deduct up to -5.0 * {gore_tolerance}).
+    - Rule 3 (Payoff): Triumphant victory vs. miserable, soul-crushing trauma loops (Add up to +1.5).
+    - Rule 4 (Narrative Puzzle): Intricate plot/puzzle, high-concept narrative architecture (Add up to +2.0 * {puzzle_weight}).
 
-    EXCEPTIONS:
+    EXCEPTIONS & BENCHMARKS:
     - Sci-Fi Franchise Armor: Twin Peaks, Alien 3 protected from squalor.
     - '12 Monkeys' Rule: Intellectual puzzle nullifies tragic ending penalty (Rule 3), but NEVER squalor (Rule 2).
+    - Benchmark comparison: Drop witty side-by-side roasts against benchmark horror/action films where fitting.
 
     Return ONLY valid JSON matching this schema:
     {{
       "score": 4.5,
-      "summary": "Write a punchy, highly opinionated 2-3 sentence summary using dramatic cinematic phrasing (e.g., 'Lethal Competence', 'Cinematic Biohazard'). Do not sound like a generic robot.",
+      "summary": "A hilarious, swagger-filled, 2-3 sentence roast or praise of the film packed with outrageous metaphors and colorful prose.",
       "breakdown": [
         "**Baseline Score**: 5.0",
-        "**Rule 1 (Agency)**: Explanation with flavor...",
-        "**Rule 2 (Squalor/Gore)**: Explanation with flavor...",
-        "**Rule 3 (Payoff)**: Explanation with flavor...",
-        "**Rule 4 (Narrative Puzzle)**: Explanation with flavor..."
+        "**Rule 1 (Agency)**: Witty explanation with swagger and colorful insults/praise...",
+        "**Rule 2 (Squalor/Gore)**: Brutally funny, vivid description of the visceral squalor...",
+        "**Rule 3 (Payoff)**: Darkly comedic breakdown of the victory or misery...",
+        "**Rule 4 (Narrative Puzzle)**: Sharp, sarcastic commentary on the narrative architecture..."
       ]
     }}
     """
     
-    # Future-proofed model string below!
     response = client.models.generate_content(
         model='gemini-flash-latest',
         contents=movie_title,
         config={
             'system_instruction': system_prompt,
-            'temperature': 0.2,
+            'temperature': 0.75,  # Unlocks creativity, humor, and prose swagger
             'response_mime_type': 'application/json'
         }
     )
     return response.text
-
+    
 # 5. UI Layout & Sidebar Controls
 st.markdown("<h1 style='text-align: center; margin-top: 1rem;'>🎬 The Movie Enjoyment Predictor</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #8b949e; font-size: 1.2rem; margin-bottom: 30px;'>Does your movie survive the algorithm?</p>", unsafe_allow_html=True)
