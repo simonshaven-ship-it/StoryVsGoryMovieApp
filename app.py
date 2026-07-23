@@ -7,6 +7,7 @@ import urllib.parse
 import html
 import base64
 import re
+from supabase import create_client, Client
 
 # 1. Setup the UI Page
 st.set_page_config(page_title="Story Vs Gory", page_icon="🎬", layout="wide")
@@ -122,13 +123,37 @@ h1, h2, h3 {
     margin-top: 15px;
     text-align: center;
 }
+.leaderboard-box {
+    background-color: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+.leaderboard-title {
+    color: #ff8f00;
+    font-weight: 800;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #30363d;
+    padding-bottom: 10px;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Securely load API Keys
+# 3. Securely load API Keys & DB connection
 api_key = st.secrets["GEMINI_API_KEY"]
 omdb_key = st.secrets["OMDB_API_KEY"]
 client = genai.Client(api_key=api_key)
+
+db_connected = False
+try:
+    supabase_url = st.secrets.get("SUPABASE_URL")
+    supabase_key = st.secrets.get("SUPABASE_KEY")
+    if supabase_url and supabase_key:
+        supabase: Client = create_client(supabase_url, supabase_key)
+        db_connected = True
+except Exception:
+    pass
 
 # Fetch html2canvas library server-side to bypass browser/iframe blocks
 @st.cache_data(ttl=86400)
@@ -229,7 +254,6 @@ def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight, pacing_we
     - THE MACGYVER EFFECT & SQUAD SYNERGY PROTOCOL (THE 'IT' RULE): If a film replaces helpless terror with group resourcefulness, juvenile tactical ingenuity, clubhouse blueprints, and a unified squad standing together to beat back evil (like the Losers' Club facing down Pennywise), it earns maximum Rule 1 agency and Rule 3 payoff bonuses, easily outscoring sprawling or uneven supernatural tales like 'Doctor Sleep'.
     - THE DEFIANT SACRIFICE PROTOCOL (THE 'ALIEN 3' RULE): A tragic ending where the protagonist asserts supreme agency (e.g., Ripley's furnace swan-dive) is a MASSIVE WIN. It completely nullifies Rule 3 tragedy penalties and guarantees a strong score (7.5 - 8.0) because the protagonist owned their fate.
     - CRITICAL CONSENSUS OVERRIDE: Ignore general critical acclaim or Rotten Tomatoes scores. If a universally praised epic drags its feet or features endless travel montages, hammer it with the Pacing Penalty. Conversely, if a panned or niche film matches the tactical, high-concept DNA, reward it.
-    - Benchmark comparison: Drop witty side-by-side roasts against benchmark horror/action films where fitting.
 
     Return ONLY valid JSON matching this schema:
     {{
@@ -287,278 +311,338 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("<p style='font-size: 0.85rem;'><b>About:</b> Built on Gemini Flash with real-time OMDb integration.</p>", unsafe_allow_html=True)
 
-# Main Input Section (Direct layout without st.form to eliminate double-submit bugs)
+# Main Input Section & Tabs
 col1, col2, col3 = st.columns([1, 2, 1])
 
 if "movie_input" not in st.session_state:
     st.session_state.movie_input = st.query_params.get("movie", "")
 
 with col2:
-    entered_movie = st.text_input("Search for a film...", key="movie_input", placeholder="e.g., The Matrix, 12 Monkeys", label_visibility="collapsed")
-    analyze_btn = st.button("Run Algorithm")
+    tab_search, tab_leaderboard = st.tabs(["🎬 Run the Algorithm", "🏆 Global Leaderboard"])
+    
+    with tab_search:
+        entered_movie = st.text_input("Search for a film...", key="movie_input", placeholder="e.g., The Matrix, 12 Monkeys", label_visibility="collapsed")
+        analyze_btn = st.button("Run Algorithm")
 
-    # Determine active movie based on button click or query param / session state
-    active_movie = ""
-    if analyze_btn and entered_movie:
-        st.query_params["movie"] = entered_movie
-        active_movie = entered_movie.strip()
-    elif not analyze_btn and st.query_params.get("movie", ""):
-        active_movie = st.query_params.get("movie", "").strip()
-    elif entered_movie:
-        active_movie = entered_movie.strip()
+        # Determine active movie
+        active_movie = ""
+        if analyze_btn and entered_movie:
+            st.query_params["movie"] = entered_movie
+            active_movie = entered_movie.strip()
+        elif not analyze_btn and st.query_params.get("movie", ""):
+            active_movie = st.query_params.get("movie", "").strip()
+        elif entered_movie:
+            active_movie = entered_movie.strip()
 
-    if active_movie:
-        safe_title = html.escape(active_movie)
-        search_query = urllib.parse.quote_plus(active_movie)
+        if active_movie:
+            safe_title = html.escape(active_movie)
+            search_query = urllib.parse.quote_plus(active_movie)
 
-        progress_box = st.empty()
-        
-        try:
-            progress_box.info(f"🎬 Fetching cinematic data for '{safe_title}'...")
-            poster_url, poster_b64, rated, genre = fetch_movie_data(active_movie)
+            progress_box = st.empty()
             
-            progress_box.info("🧠 Booting up the unhinged AI critic...")
-            raw_json = cached_gemini_analysis(active_movie, gore_tolerance, puzzle_weight, pacing_weight)
-            
-            progress_box.info("⚙️ Crunching the final Story Vs Gory score...")
-            clean_json = raw_json.strip()
-            if clean_json.startswith("```"):
-                clean_json = clean_json.strip("`").replace("json\n", "", 1).strip()
+            try:
+                progress_box.info(f"🎬 Fetching cinematic data for '{safe_title}'...")
+                poster_url, poster_b64, rated, genre = fetch_movie_data(active_movie)
                 
-            data = json.loads(clean_json)
-            
-            score_val = float(data.get("score", 5.0))
-            summary_text = html.escape(data.get("summary", ""))
-            breakdown_list = [html.escape(item) for item in data.get("breakdown", [])]
-            
-            verdict_match = re.search(r"(You should .*? this movie because.*)", summary_text, re.IGNORECASE)
-            short_summary = verdict_match.group(1) if verdict_match else summary_text.split('.')[-2] + "."
-            
-            progress_box.empty()
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            if score_val >= 8.0:
-                badge_class = "score-badge-green"
-            elif score_val >= 5.0:
-                badge_class = "score-badge-orange"
-            else:
-                badge_class = "score-badge-red"
+                progress_box.info("🧠 Booting up the unhinged AI critic...")
+                raw_json = cached_gemini_analysis(active_movie, gore_tolerance, puzzle_weight, pacing_weight)
                 
-            score_col1, score_col2 = st.columns([1, 2.5])
-            
-            with score_col1:
-                st.image(poster_url, use_container_width=True)
-                
-                st.markdown(f"""
-                <div class="streaming-box">
-                    <p style="font-size: 0.85rem; color: #8b949e; margin-bottom: 8px;"><b>Rated:</b> {rated} | <b>Genre:</b> {genre}</p>
-                    <a href="[https://www.justwatch.com/us/search?q=](https://www.justwatch.com/us/search?q=){search_query}" target="_blank" style="color: #58a6ff; text-decoration: none; font-size: 0.9rem; font-weight: 600;">🍿 Find Where to Watch</a>
-                </div>
-                """, unsafe_allow_html=True)
-                
-            with score_col2:
-                st.markdown(f"""
-                <div class="verdict-card">
-                    <div class="{badge_class}">SYSTEM SCORE: {score_val} / 10.0</div>
-                    <p style="font-size: 1.05rem; line-height: 1.6; margin-bottom: 0; color: #e6edf3;">{summary_text}</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                breakdown_html = "".join([f"<li>{item}</li>" for item in breakdown_list])
-                
-                st.markdown(f"""<div class="breakdown-card">
-<h4 style="margin-top: 0; margin-bottom: 16px; color: #ffffff;">🔍 Diagnostic Breakdown</h4>
-<ul>
-{breakdown_html}
-</ul>
-</div>""", unsafe_allow_html=True)
-
-                # --- SHARE CARD WITH INLINE SERVER-SIDE SCRIPT INJECTION ---
-                with st.expander("✨ Generate Shareable Verdict Card", expanded=True):
-                    wrapped_export_html = f"""
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                    <link href="[https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap)" rel="stylesheet">
-                    <style>
-                    body {{ 
-                        margin: 0; 
-                        padding: 20px; 
-                        font-family: 'Inter', sans-serif; 
-                        background-color: transparent; 
-                        display: flex; 
-                        flex-direction: column; 
-                        align-items: center; 
-                    }}
-                    .capture-wrapper {{
-                        padding: 10px;
-                        background-color: #0d1117;
-                        border-radius: 20px;
-                    }}
-                    .wrapped-container {{
-                        position: relative;
-                        background-image: linear-gradient(to bottom, rgba(13, 17, 23, 0.4), rgba(13, 17, 23, 0.95)), url('{poster_b64}');
-                        background-size: cover;
-                        background-position: center;
-                        border: 2px solid #ff4b4b;
-                        border-radius: 16px;
-                        padding: 40px 30px;
-                        text-align: center;
-                        box-shadow: 0 10px 40px rgba(255, 75, 75, 0.2);
-                        width: 100%;
-                        max-width: 380px;
-                        box-sizing: border-box;
-                        overflow: hidden;
-                    }}
-                    .wrapped-header {{
-                        font-size: 0.85rem;
-                        text-transform: uppercase;
-                        letter-spacing: 3px;
-                        color: #ff8f00;
-                        font-weight: 900;
-                        margin-bottom: 15px;
-                        text-shadow: 0 2px 4px rgba(0,0,0,0.8);
-                    }}
-                    .wrapped-title {{
-                        font-size: 2rem;
-                        font-weight: 900;
-                        color: #ffffff;
-                        margin-bottom: 20px;
-                        line-height: 1.1;
-                        text-shadow: 0 2px 10px rgba(0,0,0,0.8);
-                    }}
-                    .wrapped-score-box {{
-                        background: rgba(0, 0, 0, 0.75);
-                        backdrop-filter: blur(10px);
-                        -webkit-backdrop-filter: blur(10px);
-                        border: 2px solid #ff4b4b;
-                        border-radius: 16px;
-                        padding: 25px;
-                        margin: 20px 0;
-                        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-                    }}
-                    .wrapped-score {{
-                        font-size: 4.5rem;
-                        font-weight: 900;
-                        color: #ff4b4b;
-                        line-height: 1;
-                        text-shadow: 0 0 20px rgba(255, 75, 75, 0.4);
-                    }}
-                    .wrapped-quote {{
-                        font-size: 1.1rem;
-                        color: #e6edf3;
-                        font-style: italic;
-                        font-weight: 700;
-                        line-height: 1.4;
-                        margin-top: 20px;
-                        text-shadow: 0 2px 5px rgba(0,0,0,0.8);
-                    }}
-                    .wrapped-footer {{
-                        margin-top: 35px;
-                        padding-top: 15px;
-                        border-top: 1px solid rgba(255, 255, 255, 0.1);
-                        font-size: 0.75rem;
-                        color: #8b949e;
-                        font-weight: 800;
-                        letter-spacing: 2px;
-                    }}
-                    .wrapped-url {{
-                        font-size: 0.85rem;
-                        color: #58a6ff;
-                        font-weight: 600;
-                        letter-spacing: 0px;
-                        margin-top: 5px;
-                    }}
-                    .download-btn {{
-                        background: linear-gradient(90deg, #ff4b4b 0%, #ff8f00 100%);
-                        color: white;
-                        border: none;
-                        border-radius: 8px;
-                        padding: 14px 28px;
-                        font-weight: 800;
-                        cursor: pointer;
-                        font-size: 1rem;
-                        margin-top: 25px;
-                        font-family: 'Inter', sans-serif;
-                        box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4);
-                        transition: transform 0.2s;
-                    }}
-                    .download-btn:disabled {{
-                        background: #30363d;
-                        color: #8b949e;
-                        cursor: not-allowed;
-                        box-shadow: none;
-                    }}
-                    .download-btn:hover:not(:disabled) {{
-                        transform: translateY(-2px);
-                    }}
-                    </style>
-                    </head>
-                    <body>
+                progress_box.info("⚙️ Crunching the final Story Vs Gory score...")
+                clean_json = raw_json.strip()
+                if clean_json.startswith("```"):
+                    clean_json = clean_json.strip("`").replace("json\n", "", 1).strip()
                     
-                    <div class="capture-wrapper" id="wrapped-capture-area">
-                        <div class="wrapped-container">
-                            <div class="wrapped-header">Algorithm Verdict</div>
-                            <div class="wrapped-title">{safe_title}</div>
-                            <div class="wrapped-score-box">
-                                <div style="font-size: 0.75rem; color: #8b949e; margin-bottom: 5px; font-weight: 800; letter-spacing: 1px;">FINAL RATING</div>
-                                <div class="wrapped-score">{score_val}</div>
-                                <div style="font-size: 0.85rem; color: #ffffff; font-weight: 800; margin-top: 5px;">/ 10.0</div>
-                            </div>
-                            <div class="wrapped-quote">"{short_summary}"</div>
-                            <div class="wrapped-footer">
-                                STORY VS GORY<br>
-                                <div class="wrapped-url">storyvsgorymovierater.streamlit.app/?movie={search_query}</div>
+                data = json.loads(clean_json)
+                
+                score_val = float(data.get("score", 5.0))
+                summary_text = html.escape(data.get("summary", ""))
+                breakdown_list = [html.escape(item) for item in data.get("breakdown", [])]
+                
+                verdict_match = re.search(r"(You should .*? this movie because.*)", summary_text, re.IGNORECASE)
+                short_summary = verdict_match.group(1) if verdict_match else summary_text.split('.')[-2] + "."
+                
+                progress_box.empty()
+                
+                # Database Analytics Logging (Fails silently so it never breaks the user experience)
+                if db_connected:
+                    try:
+                        clean_movie_db_title = active_movie.lower().strip()
+                        existing = supabase.table("movie_analytics").select("*").eq("movie_title", clean_movie_db_title).execute()
+                        if existing.data:
+                            new_count = existing.data[0]['search_count'] + 1
+                            supabase.table("movie_analytics").update({"search_count": new_count, "score": score_val}).eq("movie_title", clean_movie_db_title).execute()
+                        else:
+                            supabase.table("movie_analytics").insert({"movie_title": clean_movie_db_title, "score": score_val, "search_count": 1}).execute()
+                    except Exception as e:
+                        pass
+                
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+                if score_val >= 8.0:
+                    badge_class = "score-badge-green"
+                elif score_val >= 5.0:
+                    badge_class = "score-badge-orange"
+                else:
+                    badge_class = "score-badge-red"
+                    
+                score_col1, score_col2 = st.columns([1, 2.5])
+                
+                with score_col1:
+                    st.image(poster_url, use_container_width=True)
+                    
+                    st.markdown(f"""
+                    <div class="streaming-box">
+                        <p style="font-size: 0.85rem; color: #8b949e; margin-bottom: 8px;"><b>Rated:</b> {rated} | <b>Genre:</b> {genre}</p>
+                        <a href="[https://www.justwatch.com/us/search?q=](https://www.justwatch.com/us/search?q=){search_query}" target="_blank" style="color: #58a6ff; text-decoration: none; font-size: 0.9rem; font-weight: 600;">🍿 Find Where to Watch</a>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                with score_col2:
+                    st.markdown(f"""
+                    <div class="verdict-card">
+                        <div class="{badge_class}">SYSTEM SCORE: {score_val} / 10.0</div>
+                        <p style="font-size: 1.05rem; line-height: 1.6; margin-bottom: 0; color: #e6edf3;">{summary_text}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    breakdown_html = "".join([f"<li>{item}</li>" for item in breakdown_list])
+                    
+                    st.markdown(f"""<div class="breakdown-card">
+    <h4 style="margin-top: 0; margin-bottom: 16px; color: #ffffff;">🔍 Diagnostic Breakdown</h4>
+    <ul>
+    {breakdown_html}
+    </ul>
+    </div>""", unsafe_allow_html=True)
+
+                    # --- SHARE CARD WITH INLINE SERVER-SIDE SCRIPT INJECTION ---
+                    with st.expander("✨ Generate Shareable Verdict Card", expanded=False):
+                        wrapped_export_html = f"""
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                        <link href="[https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap)" rel="stylesheet">
+                        <style>
+                        body {{ 
+                            margin: 0; 
+                            padding: 20px; 
+                            font-family: 'Inter', sans-serif; 
+                            background-color: transparent; 
+                            display: flex; 
+                            flex-direction: column; 
+                            align-items: center; 
+                        }}
+                        .capture-wrapper {{
+                            padding: 10px;
+                            background-color: #0d1117;
+                            border-radius: 20px;
+                        }}
+                        .wrapped-container {{
+                            position: relative;
+                            background-image: linear-gradient(to bottom, rgba(13, 17, 23, 0.4), rgba(13, 17, 23, 0.95)), url('{poster_b64}');
+                            background-size: cover;
+                            background-position: center;
+                            border: 2px solid #ff4b4b;
+                            border-radius: 16px;
+                            padding: 40px 30px;
+                            text-align: center;
+                            box-shadow: 0 10px 40px rgba(255, 75, 75, 0.2);
+                            width: 100%;
+                            max-width: 380px;
+                            box-sizing: border-box;
+                            overflow: hidden;
+                        }}
+                        .wrapped-header {{
+                            font-size: 0.85rem;
+                            text-transform: uppercase;
+                            letter-spacing: 3px;
+                            color: #ff8f00;
+                            font-weight: 900;
+                            margin-bottom: 15px;
+                            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+                        }}
+                        .wrapped-title {{
+                            font-size: 2rem;
+                            font-weight: 900;
+                            color: #ffffff;
+                            margin-bottom: 20px;
+                            line-height: 1.1;
+                            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+                        }}
+                        .wrapped-score-box {{
+                            background: rgba(0, 0, 0, 0.75);
+                            backdrop-filter: blur(10px);
+                            -webkit-backdrop-filter: blur(10px);
+                            border: 2px solid #ff4b4b;
+                            border-radius: 16px;
+                            padding: 25px;
+                            margin: 20px 0;
+                            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                        }}
+                        .wrapped-score {{
+                            font-size: 4.5rem;
+                            font-weight: 900;
+                            color: #ff4b4b;
+                            line-height: 1;
+                            text-shadow: 0 0 20px rgba(255, 75, 75, 0.4);
+                        }}
+                        .wrapped-quote {{
+                            font-size: 1.1rem;
+                            color: #e6edf3;
+                            font-style: italic;
+                            font-weight: 700;
+                            line-height: 1.4;
+                            margin-top: 20px;
+                            text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+                        }}
+                        .wrapped-footer {{
+                            margin-top: 35px;
+                            padding-top: 15px;
+                            border-top: 1px solid rgba(255, 255, 255, 0.1);
+                            font-size: 0.75rem;
+                            color: #8b949e;
+                            font-weight: 800;
+                            letter-spacing: 2px;
+                        }}
+                        .wrapped-url {{
+                            font-size: 0.85rem;
+                            color: #58a6ff;
+                            font-weight: 600;
+                            letter-spacing: 0px;
+                            margin-top: 5px;
+                        }}
+                        .download-btn {{
+                            background: linear-gradient(90deg, #ff4b4b 0%, #ff8f00 100%);
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            padding: 14px 28px;
+                            font-weight: 800;
+                            cursor: pointer;
+                            font-size: 1rem;
+                            margin-top: 25px;
+                            font-family: 'Inter', sans-serif;
+                            box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4);
+                            transition: transform 0.2s;
+                        }}
+                        .download-btn:disabled {{
+                            background: #30363d;
+                            color: #8b949e;
+                            cursor: not-allowed;
+                            box-shadow: none;
+                        }}
+                        .download-btn:hover:not(:disabled) {{
+                            transform: translateY(-2px);
+                        }}
+                        </style>
+                        </head>
+                        <body>
+                        
+                        <div class="capture-wrapper" id="wrapped-capture-area">
+                            <div class="wrapped-container">
+                                <div class="wrapped-header">Algorithm Verdict</div>
+                                <div class="wrapped-title">{safe_title}</div>
+                                <div class="wrapped-score-box">
+                                    <div style="font-size: 0.75rem; color: #8b949e; margin-bottom: 5px; font-weight: 800; letter-spacing: 1px;">FINAL RATING</div>
+                                    <div class="wrapped-score">{score_val}</div>
+                                    <div style="font-size: 0.85rem; color: #ffffff; font-weight: 800; margin-top: 5px;">/ 10.0</div>
+                                </div>
+                                <div class="wrapped-quote">"{short_summary}"</div>
+                                <div class="wrapped-footer">
+                                    STORY VS GORY<br>
+                                    <div class="wrapped-url">storyvsgorymovierater.streamlit.app/?movie={search_query}</div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <button class="download-btn" id="dl-button" onclick="downloadWrapped()">📸 Download Image</button>
-
-                    <script>
-                    {INLINE_HTML2CANVAS}
-
-                    function downloadWrapped() {{
-                        const target = document.getElementById('wrapped-capture-area');
-                        const btn = document.getElementById('dl-button');
                         
-                        if (target) {{
-                            btn.innerText = '📸 Generating...';
-                            btn.style.opacity = '0.7';
+                        <button class="download-btn" id="dl-button" onclick="downloadWrapped()">📸 Download Image</button>
+
+                        <script>
+                        {INLINE_HTML2CANVAS}
+
+                        function downloadWrapped() {{
+                            const target = document.getElementById('wrapped-capture-area');
+                            const btn = document.getElementById('dl-button');
                             
-                            html2canvas(target, {{ 
-                                backgroundColor: '#0d1117',
-                                scale: 3,
-                                useCORS: true,
-                                allowTaint: true
-                            }}).then(canvas => {{
-                                const link = document.createElement('a');
-                                link.download = 'StoryVsGory_{search_query}.png';
-                                link.href = canvas.toDataURL('image/png');
-                                link.click();
+                            if (target) {{
+                                btn.innerText = '📸 Generating...';
+                                btn.style.opacity = '0.7';
                                 
-                                btn.innerText = '📸 Download Image';
-                                btn.style.opacity = '1';
-                            }}).catch(err => {{
-                                console.error('Error generating image:', err);
-                                btn.innerText = '❌ Error - Try Again';
-                                btn.style.opacity = '1';
-                            }});
+                                html2canvas(target, {{ 
+                                    backgroundColor: '#0d1117',
+                                    scale: 3,
+                                    useCORS: true,
+                                    allowTaint: true
+                                }}).then(canvas => {{
+                                    const link = document.createElement('a');
+                                    link.download = 'StoryVsGory_{search_query}.png';
+                                    link.href = canvas.toDataURL('image/png');
+                                    link.click();
+                                    
+                                    btn.innerText = '📸 Download Image';
+                                    btn.style.opacity = '1';
+                                }}).catch(err => {{
+                                    console.error('Error generating image:', err);
+                                    btn.innerText = '❌ Error - Try Again';
+                                    btn.style.opacity = '1';
+                                }});
+                            }}
                         }}
-                    }}
-                    </script>
-                    </body>
-                    </html>
-                    """
-                    components.html(wrapped_export_html, height=850)
-                    
-        except json.JSONDecodeError:
-            progress_box.empty()
-            st.warning("⚠️ The AI got a little too wild with its swagger and broke its own formatting! Please click **'Clear AI Analysis Cache'** in the sidebar and try running it again.")
-        except Exception as e:
-            progress_box.empty()
-            if "503" in str(e) or "UNAVAILABLE" in str(e):
-                st.warning("⚠️ The movie algorithm backend is currently experiencing heavy traffic. Please give it a moment and try running it again!")
-            else:
-                st.error(f"An error occurred: {e}")
+                        </script>
+                        </body>
+                        </html>
+                        """
+                        components.html(wrapped_export_html, height=850)
+                        
+            except json.JSONDecodeError:
+                progress_box.empty()
+                st.warning("⚠️ The AI got a little too wild with its swagger and broke its own formatting! Please click **'Clear AI Analysis Cache'** in the sidebar and try running it again.")
+            except Exception as e:
+                progress_box.empty()
+                if "503" in str(e) or "UNAVAILABLE" in str(e):
+                    st.warning("⚠️ The movie algorithm backend is currently experiencing heavy traffic. Please give it a moment and try running it again!")
+                else:
+                    st.error(f"An error occurred: {e}")
+
+    with tab_leaderboard:
+        st.markdown("<h3 style='margin-top: 10px;'>🌍 Real-Time Global Standings</h3>", unsafe_allow_html=True)
+        if db_connected:
+            if st.button("🔄 Refresh Standings"):
+                pass # Streamlit natively handles reruns on button clicks!
+                
+            try:
+                # Setup Leaderboard Columns
+                lb_col1, lb_col2 = st.columns(2)
+                
+                with lb_col1:
+                    st.markdown("""
+                    <div class="leaderboard-box">
+                        <div class="leaderboard-title">🔥 Highest Scoring Masterpieces</div>
+                    """, unsafe_allow_html=True)
+                    top_movies = supabase.table("movie_analytics").select("movie_title, score").order("score", desc=True).limit(5).execute()
+                    for idx, m in enumerate(top_movies.data):
+                        st.markdown(f"**{idx+1}.** {m['movie_title'].title()} - `{m['score']}`")
+                    st.markdown("</div>", unsafe_allow_html=True)
+
+                with lb_col2:
+                    st.markdown("""
+                    <div class="leaderboard-box">
+                        <div class="leaderboard-title">🗑️ Ruthlessly Roasted</div>
+                    """, unsafe_allow_html=True)
+                    bot_movies = supabase.table("movie_analytics").select("movie_title, score").order("score", desc=False).limit(5).execute()
+                    for idx, m in enumerate(bot_movies.data):
+                        st.markdown(f"**{idx+1}.** {m['movie_title'].title()} - `{m['score']}`")
+                    st.markdown("</div>", unsafe_allow_html=True)
+
+                st.markdown("""
+                <div class="leaderboard-box">
+                    <div class="leaderboard-title">🍿 Most Investigated Films</div>
+                """, unsafe_allow_html=True)
+                pop_movies = supabase.table("movie_analytics").select("movie_title, search_count").order("search_count", desc=True).limit(5).execute()
+                for idx, m in enumerate(pop_movies.data):
+                    st.markdown(f"**{idx+1}.** {m['movie_title'].title()} — *Checked {m['search_count']} times*")
+                st.markdown("</div>", unsafe_allow_html=True)
+                
+            except Exception as e:
+                st.warning("⚠️ The Global Leaderboard is currently down for maintenance.")
+        else:
+            st.info("🔌 Waiting for the database vault to be connected. Add your Supabase keys to your secrets to activate the leaderboard!")
