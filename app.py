@@ -42,6 +42,8 @@ h1, h2, h3 {
     border: 1px solid #30363d;
     padding: 12px;
 }
+
+/* --- ACTION BUTTON --- */
 .stButton > button {
     background: linear-gradient(90deg, #ff4b4b 0%, #ff8f00 100%) !important;
     color: white !important;
@@ -57,6 +59,46 @@ h1, h2, h3 {
     box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4);
     color: white !important;
 }
+
+/* --- PREMIUM TABS STYLING --- */
+div[data-baseweb="tab-list"] {
+    gap: 15px;
+    background-color: transparent;
+    border-bottom: none;
+    padding-bottom: 20px;
+}
+button[data-baseweb="tab"] {
+    background-color: #161b22 !important;
+    border: 1px solid #30363d !important;
+    border-radius: 8px !important;
+    color: #8b949e !important;
+    padding: 10px 24px !important;
+    transition: all 0.3s ease !important;
+    margin: 0 !important;
+}
+button[data-baseweb="tab"]:hover {
+    color: #ffffff !important;
+    border-color: #ff8f00 !important;
+}
+button[data-baseweb="tab"][aria-selected="true"] {
+    background: linear-gradient(90deg, #ff4b4b 0%, #ff8f00 100%) !important;
+    border: none !important;
+    box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4) !important;
+}
+button[data-baseweb="tab"] > div[data-testid="stMarkdownContainer"] > p {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin: 0;
+    color: inherit;
+}
+button[data-baseweb="tab"][aria-selected="true"] > div[data-testid="stMarkdownContainer"] > p {
+    color: white !important;
+}
+div[data-baseweb="tab-highlight"] {
+    display: none;
+}
+
+/* --- CARDS & BADGES --- */
 .score-badge-red {
     background: rgba(248, 81, 73, 0.15);
     color: #f85149;
@@ -149,11 +191,14 @@ db_connected = False
 try:
     supabase_url = st.secrets.get("SUPABASE_URL")
     supabase_key = st.secrets.get("SUPABASE_KEY")
-    if supabase_url and supabase_key:
+    
+    if not supabase_url or not supabase_key:
+        st.error("🚨 Keys are missing! Streamlit cannot find SUPABASE_URL or SUPABASE_KEY in the secrets.")
+    else:
         supabase: Client = create_client(supabase_url, supabase_key)
         db_connected = True
-except Exception:
-    pass
+except Exception as e:
+    st.error(f"🚨 Database Connection Failed: {e}")
 
 # Fetch html2canvas library server-side to bypass browser/iframe blocks
 @st.cache_data(ttl=86400)
@@ -318,7 +363,7 @@ if "movie_input" not in st.session_state:
     st.session_state.movie_input = st.query_params.get("movie", "")
 
 with col2:
-    tab_search, tab_leaderboard = st.tabs(["🎬 Run the Algorithm", "🏆 Global Leaderboard"])
+    tab_search, tab_leaderboard = st.tabs(["Test a Movie", "Global Leaderboard"])
     
     with tab_search:
         entered_movie = st.text_input("Search for a film...", key="movie_input", placeholder="e.g., The Matrix, 12 Monkeys", label_visibility="collapsed")
