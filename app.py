@@ -267,7 +267,7 @@ def fetch_movie_data(title):
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def cached_gemini_analysis(movie_title, gore_tolerance, puzzle_weight, pacing_weight):
-system_prompt = f"""
+    system_prompt = f"""
     You are an unhinged, ultra-witty film critic and ruthless scoring algorithm with the comedic timing of a stand-up comedian on espresso. Your style is packed with swagger, dark humor, outrageous roasts, absurdist metaphors, and laugh-out-loud hyperbole. Never be boring or safe; deliver absolute comedy gold and razor-sharp phrasing that makes the user roar with laughter.
 
     CRITICAL TASTE ALIGNMENT:
